@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SM CONTROLLER</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        appBg: '#090a0c',
+                        cardBg: '#1c1c1e',
+                        cardBgLight: '#2c2c2e',
+                        brandGreen: '#2dd4bf',
+                        textGray: '#8e8e93'
+                    },
+                    backgroundImage: {
+                        'gradient-radial': 'radial-gradient(circle at top, rgba(45, 212, 191, 0.15) 0%, rgba(9, 10, 12, 1) 50%)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 0px;
+        }
+
+        .view-section {
+            display: none;
+            animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .live-pulse {
+            box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.7);
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(45, 212, 191, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(45, 212, 191, 0);
+            }
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 8px rgba(45, 212, 191, 0.6), 0 0 16px rgba(45, 212, 191, 0.4);
+            animation: neon-pulse 1.5s infinite alternate;
+        }
+
+        @keyframes neon-pulse {
+            from {
+                box-shadow: 0 0 5px rgba(45, 212, 191, 0.5), 0 0 10px rgba(45, 212, 191, 0.3);
+            }
+
+            to {
+                box-shadow: 0 0 12px rgba(45, 212, 191, 0.8), 0 0 20px rgba(45, 212, 191, 0.6), 0 0 30px rgba(45, 212, 191, 0.4);
+                border-color: rgba(45, 212, 191, 1);
+            }
+        }
+
+        .subtle-neon-border {
+            border: 1px solid rgba(45, 212, 191, 0.2);
+            animation: subtle-neon-pulse 2s infinite alternate;
+        }
+
+        @keyframes subtle-neon-pulse {
+            from {
+                box-shadow: 0 0 2px rgba(45, 212, 191, 0.1);
+                border-color: rgba(45, 212, 191, 0.15);
+            }
+
+            to {
+                box-shadow: 0 0 8px rgba(45, 212, 191, 0.25);
+                border-color: rgba(45, 212, 191, 0.4);
+            }
+        }
+
+        .text-neon {
+            text-shadow: 0 0 5px rgba(45, 212, 191, 0.8), 0 0 10px rgba(45, 212, 191, 0.5);
+        }
+
+        .dropdown-menu {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: top right;
+        }
+
+        .dropdown-hidden {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+            pointer-events: none;
+        }
+
+        .dropdown-visible {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Floating Call Box (App Bound PiP) */
+        .floating-call {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            width: 110px;
+            height: 160px;
+            border-radius: 16px;
+            border: 2px solid #2dd4bf;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(45, 212, 191, 0.4);
+            overflow: hidden;
+            z-index: 1000;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .floating-call:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+
+<body class="bg-black flex items-center justify-center min-h-screen text-white sm:py-8 font-sans" onload="startClock()">
+
+    <div id="app-container"
+        class="w-full h-full sm:w-[400px] sm:h-[850px] bg-appBg sm:rounded-[3rem] sm:border-[8px] border-gray-900 relative overflow-hidden flex flex-col shadow-2xl bg-gradient-radial">
+
+        <!-- ================= VIDEO CALL OVERLAYS ================= -->
+
+        <!-- 1. Video Ringing Overlay -->
+        <div id="video-ringing-overlay"
+            class="hidden absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center">
+            <div class="relative w-24 h-24 mb-6">
+                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&q=80"
+                    class="w-full h-full rounded-full border-2 border-brandGreen object-cover">
+                <div class="absolute inset-0 rounded-full border-2 border-brandGreen animate-ping opacity-50"></div>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-1">Galaxy S23 Ultra</h2>
+            <p class="text-brandGreen text-sm animate-pulse">Calling...</p>
+            <div class="mt-12">
+                <button onclick="endVideoCall()"
+                    class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:scale-105 transition">
+                    <i class="fa-solid fa-phone-slash text-2xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Full-Screen Video Call -->
+        <div id="fullscreen-video-call" class="hidden absolute inset-0 z-[90] bg-black flex flex-col">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800&q=80"
+                class="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none">
+            <div
+                class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none">
+            </div>
+
+            <!-- NEW: Self-View Camera Box (Top Right) -->
+            <div id="self-camera-view"
+                class="absolute top-24 right-6 w-24 h-36 bg-gray-800 rounded-xl border-2 border-gray-600 shadow-xl overflow-hidden z-20 transition-all duration-300">
+                <img src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&q=80"
+                    class="w-full h-full object-cover transform scale-x-[-1]" alt="My Camera">
+            </div>
+
+            <!-- Top Controls -->
+            <div class="relative z-10 flex justify-between items-center p-6 pt-12">
+                <button onclick="minimizeVideoCall()"
+                    class="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur hover:bg-black/60 transition shadow-lg">
+                    <i class="fa-solid fa-compress"></i>
+                </button>
+                <div
+                    class="bg-black/50 px-3 py-1 rounded-full backdrop-blur text-sm font-mono border border-gray-600 shadow-lg">
+                    <span id="fullscreen-timer">00:00</span>
+                </div>
+                <div class="w-10"></div> <!-- Spacer for flex balance -->
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="relative z-10 mt-auto pb-12 flex justify-center gap-6 items-center">
+                <!-- Toggle Camera Button -->
+                <button onclick="toggleSelfCamera()" id="btn-toggle-cam"
+                    class="w-12 h-12 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur hover:bg-gray-600 transition shadow-lg">
+                    <i id="icon-toggle-cam" class="fa-solid fa-video"></i>
+                </button>
+                <!-- Toggle Mic Button -->
+                <button
+                    class="w-12 h-12 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur hover:bg-gray-600 transition shadow-lg">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <!-- End Call Button -->
+                <button onclick="endVideoCall()"
+                    class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:scale-105 transition">
+                    <i class="fa-solid fa-phone-slash text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Minimized Floating Video Call (PiP) -->
+        <div id="floating-call-box" class="floating-call hidden bg-black">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80"
+                class="w-full h-full object-cover opacity-80 pointer-events-none">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
+            <div class="absolute top-1 left-2 bg-black/50 px-1.5 py-0.5 rounded text-[9px] font-mono"><span
+                    id="float-timer">00:00</span></div>
+            <div class="absolute bottom-2 left-0 w-full flex justify-center gap-3">
+                <button onclick="expandVideoCall()"
+                    class="w-8 h-8 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur text-[10px]"><i
+                        class="fa-solid fa-expand"></i></button>
+                <button onclick="endVideoCall()"
+                    class="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg text-[10px]"><i
+                        class="fa-solid fa-phone-slash"></i></button>
+            </div>
+            <div class="absolute top-2 right-2 w-2 h-2 bg-brandGreen rounded-full animate-pulse"></div>
+        </div>
+
+        <!-- ================= MAIN APP CONTENT ================= -->
+        <main class="flex-1 overflow-y-auto pb-28 px-6 pt-12 relative z-10">
+            <!-- ================= VIEW 1: HOME ================= -->
+            <div id="view-home" class="view-section active flex-col gap-6">
+
+                <header class="flex justify-between items-start relative z-50">
+                    <div>
+                        <h1 class="text-xl font-bold tracking-wide">SM <span class="text-brandGreen">CONTROLLER</span>
+                        </h1>
+                        <p class="text-[11px] font-semibold text-brandGreen mt-1 tracking-wider">dev: Khandaker shanto
+                        </p>
+                        <p class="text-[9px] text-textGray mt-0.5">Version 1.0.0</p>
+                    </div>
+
+                    <div class="relative">
+                        <button onclick="toggleMenu('mode-dropdown')"
+                            class="w-12 h-12 rounded-full bg-cardBg flex items-center justify-center text-brandGreen border border-brandGreen/50 neon-glow transition-all relative z-50">
+                            <i class="fa-solid fa-bars text-xl"></i>
+                        </button>
+
+                        <div id="mode-dropdown"
+                            class="dropdown-menu dropdown-hidden absolute right-0 top-14 w-52 bg-[#1c1c1e] border border-gray-700 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-40">
+                            <div class="p-2 space-y-1">
+                                <button onclick="setMode('m2m', this)"
+                                    class="mode-btn w-full text-left px-4 py-3 text-sm text-black bg-brandGreen rounded-xl font-semibold transition flex items-center gap-3">
+                                    <i class="fa-solid fa-mobile-screen w-4"></i> Mobile to Mobile
+                                </button>
+                                <button onclick="setMode('m2d', this)"
+                                    class="mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3">
+                                    <i class="fa-solid fa-desktop w-4"></i> Mobile to Desktop
+                                </button>
+                                <button onclick="setMode('d2d', this)"
+                                    class="mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3">
+                                    <i class="fa-solid fa-laptop w-4"></i> Desktop to Desktop
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <div
+                    class="bg-brandGreen text-black rounded-[2rem] p-6 flex flex-col gap-4 mt-2 shadow-[0_10px_30px_rgba(45,212,191,0.2)] relative overflow-hidden">
+                    <div class="flex justify-between items-center z-10">
+                        <p class="text-sm font-semibold opacity-80">Your Device ID</p>
+                        <div class="flex items-center gap-2 bg-black/10 px-3 py-1 rounded-full">
+                            <span class="w-2 h-2 rounded-full bg-black live-pulse"></span>
+                            <span class="text-xs font-bold" id="current-mode-label">Mobile Mode</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between z-10">
+                        <h2 class="text-4xl font-bold tracking-wider font-mono">948 201</h2>
+                        <button
+                            class="w-10 h-10 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition">
+                            <i class="fa-regular fa-copy text-lg"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex justify-between items-center z-10 pt-3 border-t border-black/20 mt-1">
+                        <span id="live-date" class="text-[13px] font-bold opacity-80">-- ---, ----</span>
+                        <span id="live-time"
+                            class="text-[13px] font-bold font-mono opacity-80 bg-black/10 px-2 py-0.5 rounded">--:--:--</span>
+                    </div>
+
+                    <i class="fa-solid fa-satellite-dish absolute -bottom-6 -right-4 text-8xl text-black opacity-5"></i>
+                </div>
+
+                <div class="bg-cardBg rounded-[2rem] p-5 mt-2 subtle-neon-border">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3">Control Remote Device</h3>
+                    <div class="flex gap-2">
+                        <div class="flex-1 bg-appBg rounded-2xl border border-gray-700 flex items-center px-4">
+                            <i class="fa-solid fa-keyboard text-textGray mr-2"></i>
+                            <input type="text" placeholder="Partner ID"
+                                class="w-full bg-transparent border-none outline-none text-white font-mono py-3">
+                        </div>
+                        <button onclick="switchTab('remote')"
+                            class="w-14 h-14 rounded-2xl bg-brandGreen text-black flex items-center justify-center text-xl hover:scale-105 transition-transform shadow-lg shadow-brandGreen/20">
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-col gap-3">
+                    <div class="flex justify-between items-end mb-1">
+                        <h3 class="text-lg font-bold">Recent Devices</h3>
+                        <span
+                            class="text-xs text-textGray font-medium cursor-pointer hover:text-brandGreen">Clear</span>
+                    </div>
+
+                    <div id="recent-devices-list" class="space-y-3">
+                        <div id="device-1"
+                            class="bg-cardBg rounded-2xl p-4 flex items-center justify-between subtle-neon-border relative transition-all duration-300">
+                            <i id="pin-icon-1"
+                                class="fa-solid fa-thumbtack absolute top-3 left-3 text-brandGreen text-[10px] hidden drop-shadow-[0_0_5px_rgba(45,212,191,0.8)]"></i>
+                            <div class="flex items-center gap-4 pl-2">
+                                <div
+                                    class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700">
+                                    <i class="fa-solid fa-mobile-screen"></i>
+                                </div>
+                                <div>
+                                    <p id="nickname-1"
+                                        class="text-[10px] font-bold text-brandGreen text-neon hidden uppercase mb-0.5">
+                                    </p>
+                                    <h4 class="font-semibold text-white text-sm">Galaxy S23 Ultra</h4>
+                                    <p class="text-xs text-textGray font-mono">ID: 412 887</p>
+                                </div>
+                            </div>
+                            <div class="relative z-20">
+                                <i onclick="toggleMenu('menu-1')"
+                                    class="fa-solid fa-ellipsis-vertical text-gray-400 hover:text-white py-2 px-3 cursor-pointer"></i>
+                                <div id="menu-1"
+                                    class="dropdown-menu dropdown-hidden absolute right-6 top-0 w-36 bg-[#2c2c2e] border border-gray-600 rounded-xl shadow-xl overflow-hidden">
+                                    <button onclick="setNickname('1')"
+                                        class="w-full text-left px-4 py-2 text-xs text-white hover:bg-brandGreen hover:text-black transition">Set
+                                        Nickname</button>
+                                    <button onclick="togglePin('1')"
+                                        class="w-full text-left px-4 py-2 text-xs text-white hover:bg-brandGreen hover:text-black transition">Pin
+                                        Device</button>
+                                    <button onclick="removeDevice('1')"
+                                        class="w-full text-left px-4 py-2 text-xs text-red-400 hover:bg-red-500 hover:text-white transition">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="device-2"
+                            class="bg-cardBg rounded-2xl p-4 flex items-center justify-between subtle-neon-border relative transition-all duration-300">
+                            <i id="pin-icon-2"
+                                class="fa-solid fa-thumbtack absolute top-3 left-3 text-brandGreen text-[10px] hidden drop-shadow-[0_0_5px_rgba(45,212,191,0.8)]"></i>
+                            <div class="flex items-center gap-4 pl-2">
+                                <div
+                                    class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-gray-400 border border-gray-700">
+                                    <i class="fa-solid fa-desktop"></i>
+                                </div>
+                                <div>
+                                    <p id="nickname-2"
+                                        class="text-[10px] font-bold text-brandGreen text-neon hidden uppercase mb-0.5">
+                                    </p>
+                                    <h4 class="font-semibold text-white text-sm">Shanto's PC</h4>
+                                    <p class="text-xs text-textGray font-mono">ID: 882 109</p>
+                                </div>
+                            </div>
+                            <div class="relative z-20">
+                                <i onclick="toggleMenu('menu-2')"
+                                    class="fa-solid fa-ellipsis-vertical text-gray-400 hover:text-white py-2 px-3 cursor-pointer"></i>
+                                <div id="menu-2"
+                                    class="dropdown-menu dropdown-hidden absolute right-6 top-0 w-36 bg-[#2c2c2e] border border-gray-600 rounded-xl shadow-xl overflow-hidden">
+                                    <button onclick="setNickname('2')"
+                                        class="w-full text-left px-4 py-2 text-xs text-white hover:bg-brandGreen hover:text-black transition">Set
+                                        Nickname</button>
+                                    <button onclick="togglePin('2')"
+                                        class="w-full text-left px-4 py-2 text-xs text-white hover:bg-brandGreen hover:text-black transition">Pin
+                                        Device</button>
+                                    <button onclick="removeDevice('2')"
+                                        class="w-full text-left px-4 py-2 text-xs text-red-400 hover:bg-red-500 hover:text-white transition">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= VIEW 2: SCREEN SHARE (REMOTE) ================= -->
+            <div id="view-remote" class="view-section flex-col h-full -mx-6 -mt-12">
+                <div class="relative w-full h-full bg-black flex flex-col">
+                    <div
+                        class="absolute top-0 w-full px-6 py-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
+                        <div
+                            class="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-gray-700">
+                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            <span class="text-xs font-semibold">Live Session</span>
+                        </div>
+                        <span
+                            class="text-xs font-mono text-gray-300 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-md">04:22</span>
+                    </div>
+                    <img src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop"
+                        class="w-full h-full object-cover opacity-70">
+
+                    <div
+                        class="absolute bottom-32 left-1/2 -translate-x-1/2 bg-cardBg/90 backdrop-blur-xl border border-gray-700 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl z-20">
+                        <button
+                            class="w-11 h-11 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
+                            <i class="fa-solid fa-keyboard"></i>
+                        </button>
+                        <button
+                            class="w-11 h-11 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+                        <button
+                            class="w-11 h-11 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                        <button
+                            class="w-11 h-11 rounded-xl bg-appBg/50 text-gray-300 hover:text-red-500 transition flex items-center justify-center relative group">
+                            <i class="fa-solid fa-circle-dot"></i>
+                            <span
+                                class="absolute -top-8 bg-black text-xs px-2 py-1 rounded hidden group-hover:block whitespace-nowrap">Record
+                                Screen</span>
+                        </button>
+                        <div class="w-[1px] h-6 bg-gray-700 mx-1"></div>
+                        <button onclick="switchTab('home')"
+                            class="w-11 h-11 rounded-xl bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center">
+                            <i class="fa-solid fa-phone-slash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= VIEW 3: TOOLS ================= -->
+            <div id="view-tools" class="view-section flex-col gap-6">
+                <header class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold">Device Tools</h2>
+                    <button
+                        class="w-12 h-12 rounded-full bg-cardBg flex items-center justify-center text-gray-400 border border-gray-800 hover:text-white transition">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </header>
+
+                <div class="grid grid-cols-2 gap-4 pb-4">
+                    <!-- Tool 1: File Manager -->
+                    <div
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-brandGreen mb-6 shadow-lg">
+                            <i class="fa-solid fa-folder-open text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">File Manager</h4>
+                        <p class="text-[11px] text-textGray">Access Gallery & Storage</p>
+                    </div>
+
+                    <!-- Tool 2: Call Logs -->
+                    <div
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-blue-400 mb-6 shadow-lg">
+                            <i class="fa-solid fa-phone text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">Call Logs</h4>
+                        <p class="text-[11px] text-textGray">View Call History</p>
+                    </div>
+
+                    <!-- Tool 3: Clipboard & Transfer (New) -->
+                    <div
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-orange-400 mb-6 shadow-lg">
+                            <i class="fa-solid fa-clipboard-list text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">Clipboard</h4>
+                        <p class="text-[11px] text-textGray">Copy, Paste & File Sync</p>
+                    </div>
+
+                    <!-- Tool 4: Live Chat / Messenger (New) -->
+                    <div onclick="switchTab('chat')"
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-purple-400 mb-6 shadow-lg group-hover:scale-110 transition">
+                            <i class="fa-solid fa-comment-dots text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">Live Chat</h4>
+                        <p class="text-[11px] text-textGray">Send Text & Voice Msg</p>
+                    </div>
+
+                    <!-- Tool 5: App Manager (New) -->
+                    <div
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-yellow-400 mb-6 shadow-lg">
+                            <i class="fa-brands fa-google-play text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">App Manager</h4>
+                        <p class="text-[11px] text-textGray">Manage Installed Apps</p>
+                    </div>
+
+                    <!-- Tool 6: System Shell (New) -->
+                    <div
+                        class="bg-cardBg rounded-[2rem] p-5 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
+                        <div
+                            class="w-12 h-12 rounded-full bg-appBg flex items-center justify-center text-cyan-400 mb-6 shadow-lg">
+                            <i class="fa-solid fa-terminal text-xl"></i>
+                        </div>
+                        <h4 class="font-semibold text-base mb-1 text-white">System Shell</h4>
+                        <p class="text-[11px] text-textGray">Remote Terminal Access</p>
+                    </div>
+                </div>
+            </div>
+            <!-- VIEW 4: LIVE CHAT (Messenger Style) -->
+            <div id="view-chat" class="view-section flex-col h-full bg-appBg absolute inset-0 z-40 pb-[85px]">
+
+                <header class="flex flex-col bg-cardBg border-b border-gray-800 z-20 pt-10">
+                    <div class="flex justify-between items-center px-4 pb-4">
+                        <div class="flex items-center gap-3">
+                            <button onclick="switchTab('tools')"
+                                class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white transition"><i
+                                    class="fa-solid fa-arrow-left text-lg"></i></button>
+                            <div class="relative">
+                                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
+                                    class="w-10 h-10 rounded-full object-cover border border-gray-700">
+                                <span
+                                    class="absolute bottom-0 right-0 w-3 h-3 bg-brandGreen rounded-full border-2 border-cardBg"></span>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-white text-sm">Galaxy S23 Ultra</h3>
+                                <p class="text-[10px] text-brandGreen">Active now</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="triggerAudioCall()"
+                                class="w-10 h-10 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700 hover:bg-gray-800 transition"><i
+                                    class="fa-solid fa-phone"></i></button>
+                            <button onclick="triggerVideoCall()"
+                                class="w-10 h-10 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700 hover:bg-gray-800 transition relative">
+                                <i class="fa-solid fa-video"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Audio Call Banner -->
+                    <div id="audio-call-banner"
+                        class="hidden bg-[#162a26] text-brandGreen text-xs font-mono py-2 px-4 flex items-center justify-between border-t border-brandGreen/20">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-brandGreen animate-pulse"></span>
+                            <span id="audio-call-status">Calling...</span>
+                        </div>
+                        <button onclick="endAudioCall()"
+                            class="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg"><i
+                                class="fa-solid fa-phone-slash text-[10px]"></i></button>
+                    </div>
+                </header>
+
+                <div
+                    class="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col justify-end bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
+                    <div class="flex gap-2 max-w-[80%]">
+                        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
+                            class="w-6 h-6 rounded-full self-end">
+                        <div>
+                            <div
+                                class="bg-cardBg border border-gray-700 p-3 rounded-2xl rounded-bl-sm text-sm text-gray-200">
+                                Hey, device is connected perfectly!</div>
+                            <span class="text-[9px] text-gray-500 mt-1 ml-1 block">10:42 AM</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 max-w-[80%] self-end flex-row-reverse">
+                        <div>
+                            <div
+                                class="bg-brandGreen text-black p-3 rounded-2xl rounded-br-sm text-sm font-medium shadow-[0_5px_15px_rgba(45,212,191,0.2)]">
+                                Can you check the file manager? I sent a photo.</div>
+                            <span class="text-[9px] text-gray-500 mt-1 mr-1 block text-right">10:44 AM <i
+                                    class="fa-solid fa-check-double text-brandGreen ml-1"></i></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-cardBg border-t border-gray-800 z-10 w-full shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
+                    <div id="chat-text-input-group" class="flex items-center gap-2 w-full transition-all duration-300">
+                        <button
+                            class="w-10 h-10 flex items-center justify-center text-brandGreen hover:bg-gray-800 rounded-full shrink-0"><i
+                                class="fa-solid fa-plus text-lg"></i></button>
+                        <button
+                            class="w-10 h-10 flex items-center justify-center text-brandGreen hover:bg-gray-800 rounded-full shrink-0"><i
+                                class="fa-regular fa-image text-lg"></i></button>
+
+                        <div
+                            class="flex-1 bg-appBg border border-gray-700 rounded-full flex items-center px-4 py-1.5 focus-within:border-brandGreen transition">
+                            <input type="text" placeholder="Message..."
+                                class="w-full bg-transparent border-none outline-none text-white text-sm py-1.5">
+                        </div>
+
+                        <button onclick="startVoiceRecord()"
+                            class="w-11 h-11 bg-brandGreen text-black rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition shrink-0"><i
+                                class="fa-solid fa-microphone text-lg"></i></button>
+                    </div>
+
+                    <div id="chat-voice-record-group"
+                        class="hidden items-center justify-between w-full bg-appBg border border-brandGreen/50 rounded-full px-4 py-1.5 transition-all duration-300">
+                        <button onclick="cancelVoiceRecord()"
+                            class="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-gray-800 rounded-full transition"><i
+                                class="fa-solid fa-trash"></i></button>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                            <span id="voice-record-timer" class="text-sm font-mono text-white">00:00</span>
+                        </div>
+                        <button onclick="sendVoiceRecord()"
+                            class="w-9 h-9 bg-brandGreen text-black rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition"><i
+                                class="fa-solid fa-paper-plane text-sm"></i></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ================= DYNAMIC FLOATING BOTTOM NAVIGATION ================= -->
+        <div id="bottom-nav"
+            class="absolute bottom-3 left-5 right-5 bg-[#1c1c1e]/90 backdrop-blur-xl subtle-neon-border p-2 rounded-2xl flex items-center gap-2 shadow-2xl z-[60]">
+
+            <button onclick="switchTab('home')" id="nav-home"
+                class="nav-btn flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 transition-all duration-300 bg-brandGreen text-black shadow-[0_0_15px_rgba(45,212,191,0.3)]">
+                <i class="fa-solid fa-house-chimney text-lg"></i>
+                <span class="nav-text text-sm font-semibold whitespace-nowrap block">Connect</span>
+            </button>
+
+            <button onclick="switchTab('remote')" id="nav-remote"
+                class="nav-btn flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 transition-all duration-300 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-desktop text-lg"></i>
+                <span class="nav-text text-sm font-semibold whitespace-nowrap hidden">Screen</span>
+            </button>
+
+            <button onclick="switchTab('tools')" id="nav-tools"
+                class="nav-btn flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 transition-all duration-300 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-toolbox text-lg"></i>
+                <span class="nav-text text-sm font-semibold whitespace-nowrap hidden">Tools</span>
+            </button>
+
+        </div>
+    </div>
+
+
+    <!-- JavaScript Actions & Logics -->
+    <script>
+        function startClock() {
+            function updateClock() {
+                const now = new Date();
+                const dateOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+                document.getElementById('live-date').innerText = now.toLocaleDateString('en-GB', dateOptions);
+                document.getElementById('live-time').innerText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function switchTab(tabId) {
+            // Views
+            document.querySelectorAll('.view-section').forEach(view => {
+                view.classList.remove('active');
+            });
+
+            const targetView = document.getElementById('view-' + tabId);
+            if (targetView) {
+                targetView.classList.add('active');
+            }
+
+            // Navigation buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className =
+                    'nav-btn flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 transition-all duration-300 text-gray-400 hover:text-white';
+
+                const text = btn.querySelector('.nav-text');
+                if (text) {
+                    text.classList.add('hidden');
+                    text.classList.remove('block');
+                }
+            });
+
+            // Active navigation
+            const activeBtn = document.getElementById('nav-' + tabId);
+
+            if (activeBtn) {
+                activeBtn.className =
+                    'nav-btn flex-1 min-w-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 transition-all duration-300 bg-brandGreen text-black shadow-[0_0_15px_rgba(45,212,191,0.3)]';
+
+                const text = activeBtn.querySelector('.nav-text');
+                if (text) {
+                    text.classList.remove('hidden');
+                    text.classList.add('block');
+                }
+            }
+        }
+
+        function toggleMenu(menuId) {
+            const dropdown = document.getElementById(menuId);
+            document.querySelectorAll('.dropdown-menu').forEach(el => {
+                if (el.id !== menuId && el.classList.contains('dropdown-visible')) {
+                    el.classList.add('dropdown-hidden');
+                    el.classList.remove('dropdown-visible');
+                }
+            });
+
+            if (dropdown.classList.contains('dropdown-hidden')) {
+                dropdown.classList.remove('dropdown-hidden');
+                dropdown.classList.add('dropdown-visible');
+            } else {
+                dropdown.classList.add('dropdown-hidden');
+                dropdown.classList.remove('dropdown-visible');
+            }
+        }
+
+        function setMode(mode, btnElement) {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.className = 'mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3';
+            });
+            btnElement.className = 'mode-btn w-full text-left px-4 py-3 text-sm text-black bg-brandGreen rounded-xl font-semibold transition flex items-center gap-3';
+
+            const toolsNav = document.getElementById('nav-tools');
+            const modeLabel = document.getElementById('current-mode-label');
+
+            if (mode === 'm2m') {
+                toolsNav.style.display = 'flex';
+                modeLabel.innerText = 'Mobile Mode';
+            } else {
+                toolsNav.style.display = 'none';
+                modeLabel.innerText = 'Desktop Mode';
+                if (document.getElementById('view-tools').classList.contains('active')) switchTab('home');
+            }
+            toggleMenu('mode-dropdown');
+        }
+
+        function togglePin(id) {
+            const card = document.getElementById('device-' + id);
+            const pinIcon = document.getElementById('pin-icon-' + id);
+            const list = document.getElementById('recent-devices-list');
+
+            if (pinIcon.classList.contains('hidden')) {
+                pinIcon.classList.remove('hidden');
+                list.prepend(card);
+            } else {
+                pinIcon.classList.add('hidden');
+                list.appendChild(card);
+            }
+            toggleMenu('menu-' + id);
+        }
+
+        function setNickname(id) {
+            const nicknameText = prompt("Enter a nickname for this device:");
+            const nickElement = document.getElementById('nickname-' + id);
+            if (nicknameText && nicknameText.trim() !== "") {
+                nickElement.innerText = nicknameText;
+                nickElement.classList.remove('hidden');
+            }
+            toggleMenu('menu-' + id);
+        }
+
+        function removeDevice(id) {
+            if (confirm("Are you sure you want to remove this device?")) {
+                document.getElementById('device-' + id).remove();
+            }
+        }
+
+        // ================= LIVE CHAT / CALL LOGICS ================= //
+
+        let isVideoCallActive = false;
+        let videoCallTimer = null, videoSeconds = 0;
+        let audioCallTimer = null, audioSeconds = 0;
+        let voiceRecordTimer = null, voiceSeconds = 0;
+        let isSelfCameraOn = true;
+
+        function triggerVideoCall() {
+            if (isVideoCallActive) return;
+            document.getElementById('video-ringing-overlay').classList.remove('hidden');
+            setTimeout(() => {
+                if (!document.getElementById('video-ringing-overlay').classList.contains('hidden')) {
+                    document.getElementById('video-ringing-overlay').classList.add('hidden');
+                    openFullScreenVideoCall();
+                }
+            }, 2000);
+        }
+
+        function openFullScreenVideoCall() {
+            isVideoCallActive = true;
+            document.getElementById('fullscreen-video-call').classList.remove('hidden');
+            document.getElementById('floating-call-box').classList.add('hidden');
+
+            videoSeconds = 0;
+            videoCallTimer = setInterval(() => {
+                videoSeconds++;
+                const timeStr = String(Math.floor(videoSeconds / 60)).padStart(2, '0') + ':' +
+                    String(videoSeconds % 60).padStart(2, '0');
+                document.getElementById('fullscreen-timer').innerText = timeStr;
+                document.getElementById('float-timer').innerText = timeStr;
+            }, 1000);
+        }
+
+        function toggleSelfCamera() {
+            const selfView = document.getElementById('self-camera-view');
+            const icon = document.getElementById('icon-toggle-cam');
+            const btn = document.getElementById('btn-toggle-cam');
+
+            if (isSelfCameraOn) {
+                selfView.classList.add('hidden');
+                icon.classList.remove('fa-video');
+                icon.classList.add('fa-video-slash');
+                btn.classList.add('text-red-400');
+                btn.classList.remove('text-white');
+                isSelfCameraOn = false;
+            } else {
+                selfView.classList.remove('hidden');
+                icon.classList.remove('fa-video-slash');
+                icon.classList.add('fa-video');
+                btn.classList.remove('text-red-400');
+                btn.classList.add('text-white');
+                isSelfCameraOn = true;
+            }
+        }
+
+        function minimizeVideoCall() {
+            document.getElementById('fullscreen-video-call').classList.add('hidden');
+            document.getElementById('floating-call-box').classList.remove('hidden');
+        }
+
+        function expandVideoCall() {
+            document.getElementById('floating-call-box').classList.add('hidden');
+            document.getElementById('fullscreen-video-call').classList.remove('hidden');
+        }
+
+        function endVideoCall() {
+            isVideoCallActive = false;
+            clearInterval(videoCallTimer);
+            document.getElementById('video-ringing-overlay').classList.add('hidden');
+            document.getElementById('fullscreen-video-call').classList.add('hidden');
+            document.getElementById('floating-call-box').classList.add('hidden');
+            document.getElementById('fullscreen-timer').innerText = "00:00";
+        }
+
+        function triggerAudioCall() {
+            const banner = document.getElementById('audio-call-banner');
+            const statusText = document.getElementById('audio-call-status');
+            banner.classList.remove('hidden');
+            statusText.innerText = "Calling...";
+
+            setTimeout(() => {
+                if (!banner.classList.contains('hidden')) {
+                    audioSeconds = 0;
+                    clearInterval(audioCallTimer);
+                    audioCallTimer = setInterval(() => {
+                        audioSeconds++;
+                        statusText.innerText =
+                            String(Math.floor(audioSeconds / 60)).padStart(2, '0') + ':' +
+                            String(audioSeconds % 60).padStart(2, '0');
+                    }, 1000);
+                }
+            }, 2000);
+        }
+
+        function endAudioCall() {
+            clearInterval(audioCallTimer);
+            document.getElementById('audio-call-banner').classList.add('hidden');
+        }
+
+        function startVoiceRecord() {
+            document.getElementById('chat-text-input-group').classList.add('hidden');
+            document.getElementById('chat-text-input-group').classList.remove('flex');
+            document.getElementById('chat-voice-record-group').classList.remove('hidden');
+            document.getElementById('chat-voice-record-group').classList.add('flex');
+
+            voiceSeconds = 0;
+            document.getElementById('voice-record-timer').innerText = "00:00";
+            clearInterval(voiceRecordTimer);
+            voiceRecordTimer = setInterval(() => {
+                voiceSeconds++;
+                document.getElementById('voice-record-timer').innerText =
+                    String(Math.floor(voiceSeconds / 60)).padStart(2, '0') + ':' +
+                    String(voiceSeconds % 60).padStart(2, '0');
+            }, 1000);
+        }
+
+        function cancelVoiceRecord() {
+            clearInterval(voiceRecordTimer);
+            resetVoiceUI();
+        }
+
+        function sendVoiceRecord() {
+            clearInterval(voiceRecordTimer);
+            resetVoiceUI();
+        }
+
+        function resetVoiceUI() {
+            document.getElementById('chat-voice-record-group').classList.add('hidden');
+            document.getElementById('chat-voice-record-group').classList.remove('flex');
+            document.getElementById('chat-text-input-group').classList.remove('hidden');
+            document.getElementById('chat-text-input-group').classList.add('flex');
+        }
+
+        const dragItem = document.getElementById("floating-call-box");
+        const container = document.getElementById("app-container");
+        let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+
+        if (dragItem && container) {
+            dragItem.addEventListener("touchstart", dragStart, { passive: false });
+            document.addEventListener("touchend", dragEnd, false);
+            document.addEventListener("touchmove", drag, { passive: false });
+            dragItem.addEventListener("mousedown", dragStart, false);
+            document.addEventListener("mouseup", dragEnd, false);
+            document.addEventListener("mousemove", drag, false);
+        }
+
+        function dragStart(e) {
+            if (e.target.closest('.floating-call') && !e.target.closest('button')) {
+                active = true;
+                initialX = (e.type === "touchstart") ? e.touches[0].clientX - xOffset : e.clientX - xOffset;
+                initialY = (e.type === "touchstart") ? e.touches[0].clientY - yOffset : e.clientY - yOffset;
+            }
+        }
+
+        function dragEnd() {
+            active = false;
+        }
+
+        function drag(e) {
+            if (active && dragItem && container) {
+                e.preventDefault();
+                currentX = (e.type === "touchmove") ? e.touches[0].clientX - initialX : e.clientX - initialX;
+                currentY = (e.type === "touchmove") ? e.touches[0].clientY - initialY : e.clientY - initialY;
+
+                const maxX = container.clientWidth - dragItem.clientWidth - 20;
+                const maxY = container.clientHeight - dragItem.clientHeight - 20;
+                currentX = Math.min(Math.max(-maxX, currentX), 0);
+                currentY = Math.min(Math.max(0, currentY), maxY);
+
+                xOffset = currentX;
+                yOffset = currentY;
+                dragItem.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+            }
+        }
+
+        document.addEventListener('click', function (event) {
+            if (!event.target.closest('.relative')) {
+                document.querySelectorAll('.dropdown-menu').forEach(el => {
+                    el.classList.add('dropdown-hidden');
+                    el.classList.remove('dropdown-visible');
+                });
+            }
+        });
+    </script>
+
+</body>
+
+</html>
