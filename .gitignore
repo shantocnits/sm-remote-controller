@@ -1,0 +1,23 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Android
+android/app/build/
+android/.gradle/
+android/build/
+android/app/debug.keystore
+
+# iOS
+ios/Pods/
+ios/build/
+
+# Metro & Bundles
+.metro-health-check*
+*.bundle
+*.jsbundle
+
+# Temporary scratch
+scratch/
+test-bundle.js
