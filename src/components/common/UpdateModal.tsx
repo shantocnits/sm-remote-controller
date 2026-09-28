@@ -133,25 +133,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }, 300);
   };
 
-  // Helper to simulate a new version available for testing
-  const handleSimulateNewVersion = () => {
-    const nextVer = '1.1.0';
-    setUpdateInfo({
-      hasUpdate: true,
-      currentVersion: appVersion,
-      latestVersion: nextVer,
-      releaseDate: '28 Sept 2026',
-      changelog: [
-        '🚀 New: Live Screen Recording with automatic MP4 export',
-        '📸 New: Camera Shutter Flash & instant Screenshot preview',
-        '🎙️ New: Real-time Mic Mute / Unmute voice toggle',
-        '⌨️ New: Remote Virtual Keyboard & PC Shortcut Key tray',
-        '⚡ Performance improvements & ultra-low latency stream',
-      ],
-    });
-    setIsUpdated(false);
-  };
-
   const isUpToDate = (!updateInfo.hasUpdate || isUpdated) && !loading;
 
   const spin = spinAnim.interpolate({
@@ -275,16 +256,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             </View>
           )}
 
-          {/* Interactive Simulation Helper for User Testing */}
-          {isUpToDate && (
-            <TouchableOpacity
-              onPress={handleSimulateNewVersion}
-              style={styles.simulateRow}>
-              <Text style={styles.simulateText}>
-                🧪 Test OTA: Simulate v1.1.0 update available
-              </Text>
-            </TouchableOpacity>
-          )}
+
         </View>
       </View>
     </Modal>
@@ -488,14 +460,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  simulateRow: {
-    marginTop: 10,
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  simulateText: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    textDecorationLine: 'underline',
-  },
+
 });
