@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Easing,
+  Linking,
 } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
@@ -109,12 +110,22 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             latestVersion: targetVersion,
           }));
 
-          const msg = `🎉 Update v${targetVersion} applied successfully!`;
+          const msg = `🎉 Update v${targetVersion} applied!`;
           if (Platform.OS === 'android') {
             ToastAndroid.show(msg, ToastAndroid.LONG);
           } else {
             Alert.alert('Update Complete', msg);
           }
+
+          // If a direct APK downloadUrl is provided from GitHub, open browser to download APK directly
+          if (updateInfo.downloadUrl) {
+            Linking.canOpenURL(updateInfo.downloadUrl).then((supported) => {
+              if (supported) {
+                Linking.openURL(updateInfo.downloadUrl!);
+              }
+            }).catch(() => {});
+          }
+
           return 100;
         }
         return prev + 25;
