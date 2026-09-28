@@ -15,7 +15,11 @@ export type IconName =
   | 'trash'
   | 'camera'
   | 'microphone'
+  | 'microphone-slash'
   | 'record'
+  | 'stop'
+  | 'play'
+  | 'share'
   | 'phone-slash'
   | 'phone'
   | 'video'
@@ -79,8 +83,16 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
         return <FontAwesome6 name="camera" size={size} color={color} style={style} />;
       case 'microphone':
         return <FontAwesome6 name="microphone" size={size} color={color} style={style} />;
+      case 'microphone-slash':
+        return <FontAwesome6 name="microphone-slash" size={size} color={color} style={style} />;
       case 'record':
         return <FontAwesome6 name="circle-dot" size={size} color={color} style={style} />;
+      case 'stop':
+        return <FontAwesome6 name="stop" size={size} color={color} style={style} />;
+      case 'play':
+        return <FontAwesome6 name="play" size={size} color={color} style={style} />;
+      case 'share':
+        return <FontAwesome6 name="share-nodes" size={size} color={color} style={style} />;
       case 'phone-slash':
         return <FontAwesome6 name="phone-slash" size={size} color={color} style={style} />;
       case 'phone':

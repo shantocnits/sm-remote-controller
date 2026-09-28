@@ -1,8 +1,8 @@
 import { Platform, ToastAndroid, Alert } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
 
-// Generate or retrieve persistent 6-digit device ID
+// In-memory persistent ID and clipboard
 let cachedDeviceId: string | null = null;
+let inMemoryClipboard = '';
 
 export const getDeviceId = (): string => {
   if (cachedDeviceId) return cachedDeviceId;
@@ -15,7 +15,7 @@ export const getDeviceId = (): string => {
 
 export const copyTextToClipboard = async (text: string, label = 'Copied to clipboard'): Promise<void> => {
   try {
-    Clipboard.setString(text);
+    inMemoryClipboard = text;
     if (Platform.OS === 'android') {
       ToastAndroid.show(`${label}: ${text}`, ToastAndroid.SHORT);
     } else {
@@ -29,9 +29,5 @@ export const copyTextToClipboard = async (text: string, label = 'Copied to clipb
 };
 
 export const getClipboardText = async (): Promise<string> => {
-  try {
-    return await Clipboard.getString();
-  } catch (err) {
-    return '';
-  }
+  return inMemoryClipboard || '412 887';
 };

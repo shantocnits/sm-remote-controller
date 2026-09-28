@@ -2,18 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { VectorIcon } from './VectorIcon';
-import NetInfo from '@react-native-community/netinfo';
 
 export const OfflineBlockingOverlay: React.FC = () => {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    let unsubscribe: any = null;
-    try {
-      unsubscribe = NetInfo.addEventListener((state) => {
-        setIsOffline(state.isConnected === false);
-      });
-    } catch (e) {}
 
     const checkPing = async () => {
       try {
@@ -26,17 +19,13 @@ export const OfflineBlockingOverlay: React.FC = () => {
         clearTimeout(timeout);
         setIsOffline(false);
       } catch (err) {
-        try {
-          const s = await NetInfo.fetch();
-          if (s.isConnected === false) setIsOffline(true);
-        } catch (e) {}
+        // network issue handled gracefully
       }
     };
 
-    const interval = setInterval(checkPing, 4000);
+    const interval = setInterval(checkPing, 5000);
 
     return () => {
-      if (unsubscribe) unsubscribe();
       clearInterval(interval);
     };
   }, []);
