@@ -147,6 +147,22 @@
             cursor: grab;
             touch-action: none;
         }
+
+        /* Toast notification */
+        .toast-banner {
+            animation: slideDown 0.3s ease forwards;
+        }
+
+        @keyframes slideDown {
+            from { transform: translate(-50%, -100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        /* Shutter flash animation */
+        #shutter-flash {
+            transition: opacity 0.35s ease-out;
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -154,6 +170,14 @@
 
     <div id="app-container"
         class="w-full h-full bg-appBg relative overflow-hidden flex flex-col bg-gradient-radial">
+
+        <!-- Shutter Flash Overlay -->
+        <div id="shutter-flash" class="absolute inset-0 bg-white z-[300] opacity-0 pointer-events-none"></div>
+
+        <!-- Floating Toast Banner -->
+        <div id="app-toast" style="display: none;" class="hidden fixed top-6 left-1/2 -translate-x-1/2 z-[400] bg-[#161a22]/95 border border-brandGreen/60 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 toast-banner">
+            <span id="toast-text">Notification</span>
+        </div>
 
         <!-- ================= STRICT OFFLINE BLOCKING OVERLAY ================= -->
         <div id="offline-blocking-overlay" style="display: none;" class="hidden absolute inset-0 z-[200] bg-[#090a0c]/98 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center select-none">
@@ -172,11 +196,11 @@
 
         <!-- ================= IN-APP UPDATE MODAL ================= -->
         <div id="modal-update" style="display: none;" class="hidden absolute inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-            <div class="w-full bg-[#1c1c1e] rounded-3xl border border-brandGreen/40 p-5 shadow-2xl max-h-[90%] flex flex-col">
+            <div class="w-full max-w-sm bg-[#1c1c1e] rounded-3xl border border-brandGreen/40 p-5 shadow-2xl max-h-[90%] flex flex-col">
                 <div class="flex justify-between items-center mb-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-appBg flex items-center justify-center border border-brandGreen/40 text-brandGreen">
-                            <i class="fa-solid fa-cloud-arrow-down text-lg"></i>
+                        <div id="update-icon-box" class="w-10 h-10 rounded-full bg-appBg flex items-center justify-center border border-brandGreen/40 text-brandGreen">
+                            <i id="update-icon" class="fa-solid fa-cloud-arrow-down text-lg"></i>
                         </div>
                         <div>
                             <h3 class="font-bold text-base text-white">App Updates</h3>
@@ -191,7 +215,7 @@
                 <div class="flex bg-appBg rounded-2xl p-3 border border-gray-800 mb-4 text-center">
                     <div class="flex-1">
                         <p class="text-[10px] text-textGray">Current Version</p>
-                        <p class="text-sm font-bold font-mono">v1.0.0</p>
+                        <p id="app-current-ver-text" class="text-sm font-bold font-mono">v1.0.0</p>
                     </div>
                     <div class="w-[1px] bg-gray-800"></div>
                     <div class="flex-1">
@@ -200,8 +224,13 @@
                     </div>
                 </div>
 
-                <p class="text-xs font-bold mb-2">What's New in this Release:</p>
-                <div id="changelog-container" class="flex-1 overflow-y-auto bg-appBg rounded-xl p-3 border border-gray-800 space-y-2 mb-4 text-xs text-gray-300">
+                <div class="flex justify-between items-center mb-2">
+                    <p class="text-xs font-bold">What's New in this Release:</p>
+                    <button onclick="checkUpdatesOnline()" class="text-[11px] text-brandGreen font-semibold hover:underline flex items-center gap-1">
+                        <i id="check-again-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i> Check Again
+                    </button>
+                </div>
+                <div id="changelog-container" class="flex-1 overflow-y-auto bg-appBg rounded-xl p-3 border border-gray-800 space-y-2 mb-4 text-xs text-gray-300 max-h-48">
                     <p>• 🔥 Custom Remote Controller App Icon & Brand Logo</p>
                     <p>• 🚀 In-App GitHub Auto-Update System with changelog</p>
                     <p>• ✨ Interactive File Manager, Call Logs, App Manager & System Shell</p>
@@ -211,7 +240,7 @@
 
                 <div id="update-progress-box" class="hidden mb-3">
                     <div class="flex justify-between text-xs mb-1">
-                        <span class="text-gray-400">Downloading update...</span>
+                        <span class="text-gray-400">Downloading update from GitHub...</span>
                         <span id="update-progress-text" class="text-brandGreen font-bold font-mono">0%</span>
                     </div>
                     <div class="w-full h-1.5 bg-appBg rounded-full overflow-hidden">
@@ -224,174 +253,93 @@
                         <i class="fa-solid fa-check"></i> You are on the latest version (v1.0.0)
                     </div>
                 </div>
+
+                <!-- Simulation Helper -->
+                <div class="mt-3 text-center">
+                    <button onclick="simulateNewUpdateAvailable()" class="text-[10px] text-gray-500 hover:text-brandGreen underline">
+                        🧪 Test OTA: Simulate v1.1.0 update available
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- ================= FILE MANAGER MODAL ================= -->
-        <div id="modal-file-manager" style="display: none;" class="hidden absolute inset-0 z-[110] bg-black/80 backdrop-blur-sm flex flex-col justify-end">
-            <div class="w-full bg-[#1c1c1e] rounded-t-3xl border-t border-brandGreen/40 p-5 max-h-[85%] flex flex-col">
+        <!-- ================= MODAL: RECORDING SAVED ================= -->
+        <div id="modal-recording-saved" style="display: none;" class="hidden absolute inset-0 z-[130] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="w-full max-w-sm bg-[#161922] rounded-3xl border border-red-500/40 p-6 text-center shadow-2xl">
+                <div class="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 text-2xl mx-auto mb-3">
+                    <i class="fa-solid fa-circle-dot"></i>
+                </div>
+                <h3 class="text-base font-bold text-white mb-1">Video Recording Saved!</h3>
+                <p class="text-xs text-gray-400 mb-4">Remote screen session successfully captured.</p>
+
+                <div class="bg-[#0c0f14] p-3 rounded-xl border border-gray-800 text-xs text-left space-y-1.5 mb-5 font-mono">
+                    <div class="flex justify-between"><span class="text-gray-500">File:</span><span id="saved-video-name" class="text-white font-bold">SM_Record_2250.mp4</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Duration:</span><span id="saved-video-dur" class="text-brandGreen font-bold">00:45</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Saved to:</span><span class="text-gray-300">/Movies/SM_Recordings</span></div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="showToast('Video ready to share'); toggleModal('modal-recording-saved');" class="flex-1 py-3 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-700">Share</button>
+                    <button onclick="toggleModal('modal-recording-saved')" class="flex-1 py-3 rounded-xl bg-brandGreen text-black text-xs font-bold hover:scale-105 transition">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: SCREENSHOT CAPTURED ================= -->
+        <div id="modal-screenshot" style="display: none;" class="hidden absolute inset-0 z-[130] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="w-full max-w-sm bg-[#161922] rounded-3xl border border-brandGreen/40 p-6 text-center shadow-2xl">
+                <div class="w-14 h-14 rounded-full bg-brandGreen/10 border border-brandGreen/30 flex items-center justify-center text-brandGreen text-2xl mx-auto mb-3">
+                    <i class="fa-solid fa-camera"></i>
+                </div>
+                <h3 class="text-base font-bold text-white mb-1">Screenshot Captured!</h3>
+                <p class="text-xs text-gray-400 mb-4">High-resolution snapshot saved to Pictures.</p>
+
+                <div class="bg-[#0c0f14] p-3 rounded-xl border border-gray-800 text-xs text-left space-y-1.5 mb-5 font-mono">
+                    <div class="flex justify-between"><span class="text-gray-500">File:</span><span id="screenshot-file-name" class="text-white font-bold">SM_Screen_2250.png</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Resolution:</span><span class="text-brandGreen font-bold">1080 x 2400 (FHD)</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Saved to:</span><span class="text-gray-300">Pictures/Screenshots</span></div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="showToast('Screenshot shared'); toggleModal('modal-screenshot');" class="flex-1 py-3 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-700">Share</button>
+                    <button onclick="toggleModal('modal-screenshot')" class="flex-1 py-3 rounded-xl bg-brandGreen text-black text-xs font-bold hover:scale-105 transition">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: REMOTE KEYBOARD SHEET ================= -->
+        <div id="modal-remote-keyboard" style="display: none;" class="hidden absolute inset-0 z-[130] bg-black/75 backdrop-blur-sm flex flex-col justify-end">
+            <div class="w-full bg-[#161922] rounded-t-3xl border-t border-brandGreen/40 p-5 shadow-2xl flex flex-col">
+                <div class="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4"></div>
                 <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-brandGreen/30">
-                            <i class="fa-solid fa-folder-open"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-base">File Manager</h3>
-                            <p class="text-[10px] text-brandGreen">Used: 42.8 GB / 128 GB</p>
-                        </div>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-keyboard text-brandGreen"></i>
+                        <h3 class="font-bold text-sm text-white">Remote Keyboard Input</h3>
                     </div>
-                    <button onclick="toggleModal('modal-file-manager')" class="w-8 h-8 rounded-full bg-cardBgLight flex items-center justify-center text-gray-400">
+                    <button onclick="toggleModal('modal-remote-keyboard')" class="w-8 h-8 rounded-full bg-cardBgLight flex items-center justify-center text-gray-400 hover:text-white">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <div class="w-full h-1.5 bg-appBg rounded-full overflow-hidden mb-4">
-                    <div class="w-[35%] h-full bg-brandGreen"></div>
+
+                <div class="flex items-center bg-[#0c0f14] border border-gray-700 rounded-xl px-3 py-1 mb-4">
+                    <input id="remote-key-input" type="text" placeholder="Type text to send to remote..." class="w-full bg-transparent border-none outline-none text-white text-xs py-2">
+                    <button onclick="sendRemoteText()" class="w-8 h-8 rounded-lg bg-brandGreen text-black flex items-center justify-center ml-2 hover:scale-105 transition"><i class="fa-solid fa-paper-plane text-xs"></i></button>
                 </div>
-                <div class="space-y-2 overflow-y-auto flex-1">
-                    <div class="p-3 bg-appBg rounded-xl flex items-center justify-between border border-gray-800">
-                        <div class="flex items-center gap-3">
-                            <i class="fa-regular fa-image text-brandGreen"></i>
-                            <div>
-                                <p class="text-xs font-semibold">IMG_20260928_124500.jpg</p>
-                                <p class="text-[10px] text-textGray">3.4 MB • Today</p>
-                            </div>
-                        </div>
-                        <button onclick="alert('Sending to connected device...')" class="text-xs text-brandGreen"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                    <div class="p-3 bg-appBg rounded-xl flex items-center justify-between border border-gray-800">
-                        <div class="flex items-center gap-3">
-                            <i class="fa-solid fa-file-pdf text-orange-400"></i>
-                            <div>
-                                <p class="text-xs font-semibold">Client_Requirements.pdf</p>
-                                <p class="text-[10px] text-textGray">1.2 MB • Today</p>
-                            </div>
-                        </div>
-                        <button onclick="alert('Sending to connected device...')" class="text-xs text-brandGreen"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                    <div class="p-3 bg-appBg rounded-xl flex items-center justify-between border border-gray-800">
-                        <div class="flex items-center gap-3">
-                            <i class="fa-brands fa-android text-yellow-400"></i>
-                            <div>
-                                <p class="text-xs font-semibold">sm-remote-controller.apk</p>
-                                <p class="text-[10px] text-textGray">48.5 MB • 27 Sept</p>
-                            </div>
-                        </div>
-                        <button onclick="alert('Sending to connected device...')" class="text-xs text-brandGreen"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
+
+                <p class="text-[11px] font-semibold text-gray-400 mb-2">Remote Shortcut Keys:</p>
+                <div class="grid grid-cols-4 gap-2 mb-2">
+                    <button onclick="sendShortcutKey('Enter')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Enter ↵</button>
+                    <button onclick="sendShortcutKey('Backspace')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">⌫ Back</button>
+                    <button onclick="sendShortcutKey('Tab')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Tab ⇥</button>
+                    <button onclick="sendShortcutKey('Esc')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Esc</button>
+                </div>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="sendShortcutKey('Ctrl+C')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Ctrl+C</button>
+                    <button onclick="sendShortcutKey('Ctrl+V')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Ctrl+V</button>
+                    <button onclick="sendShortcutKey('Space')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Space ␣</button>
+                    <button onclick="sendShortcutKey('Win/Home')" class="py-2.5 bg-[#222834] rounded-lg text-xs font-semibold hover:bg-brandGreen hover:text-black transition">Win ⌘</button>
                 </div>
             </div>
-        </div>
-
-        <!-- ================= SYSTEM SHELL MODAL ================= -->
-        <div id="modal-system-shell" style="display: none;" class="hidden absolute inset-0 z-[110] bg-black/85 backdrop-blur-sm flex flex-col justify-end">
-            <div class="w-full bg-[#0c0f14] rounded-t-3xl border-t border-cyan-400/40 p-5 max-h-[85%] flex flex-col">
-                <div class="flex justify-between items-center mb-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-[#090a0c] flex items-center justify-center text-cyan-400 border border-cyan-400/30">
-                            <i class="fa-solid fa-terminal"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-base">System Shell</h3>
-                            <p class="text-[10px] text-cyan-400">Remote Linux/Android Console</p>
-                        </div>
-                    </div>
-                    <button onclick="toggleModal('modal-system-shell')" class="w-8 h-8 rounded-full bg-cardBgLight flex items-center justify-center text-gray-400">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-                <div id="shell-output" class="h-64 bg-[#05070a] rounded-xl p-3 font-mono text-xs text-brandGreen overflow-y-auto space-y-1 mb-3 border border-gray-800">
-                    <p class="text-gray-500">SM Remote Terminal Bridge v1.0.0 [Ready]</p>
-                    <p class="text-gray-500">Type "help", "status", "ping", "info" to execute.</p>
-                </div>
-                <div class="flex items-center bg-[#161a22] rounded-xl px-3 py-2 border border-cyan-400/30">
-                    <span class="text-cyan-400 font-mono font-bold mr-2">$</span>
-                    <input id="shell-input" type="text" placeholder="Enter command..." class="flex-1 bg-transparent text-white font-mono text-xs outline-none" onkeydown="handleShellKey(event)">
-                    <button onclick="executeShellCmd()" class="text-cyan-400 text-xs px-2"><i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= VIDEO CALL OVERLAYS ================= -->
-
-        <!-- 1. Video Ringing Overlay -->
-        <div id="video-ringing-overlay" style="display: none;"
-            class="hidden absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center">
-            <div class="relative w-24 h-24 mb-6">
-                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&q=80"
-                    class="w-full h-full rounded-full border-2 border-brandGreen object-cover">
-                <div class="absolute inset-0 rounded-full border-2 border-brandGreen animate-ping opacity-50"></div>
-            </div>
-            <h2 class="text-2xl font-bold text-white mb-1">Galaxy S23 Ultra</h2>
-            <p class="text-brandGreen text-sm animate-pulse">Calling...</p>
-            <div class="mt-12">
-                <button onclick="endVideoCall()"
-                    class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.5)] hover:scale-105 transition">
-                    <i class="fa-solid fa-phone-slash text-2xl"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- 2. Full-Screen Video Call -->
-        <div id="fullscreen-video-call" style="display: none;" class="hidden absolute inset-0 z-[90] bg-black flex flex-col">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800&q=80"
-                class="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none">
-            <div
-                class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none">
-            </div>
-
-            <!-- Self-View Camera Box -->
-            <div id="self-camera-view"
-                class="absolute top-20 right-5 w-24 h-36 bg-gray-800 rounded-xl border-2 border-gray-600 shadow-xl overflow-hidden z-20 transition-all duration-300">
-                <img src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&q=80"
-                    class="w-full h-full object-cover transform scale-x-[-1]" alt="My Camera">
-            </div>
-
-            <!-- Top Controls -->
-            <div class="relative z-10 flex justify-between items-center p-6 pt-10">
-                <button onclick="minimizeVideoCall()"
-                    class="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur hover:bg-black/60 transition shadow-lg">
-                    <i class="fa-solid fa-compress"></i>
-                </button>
-                <div
-                    class="bg-black/50 px-3 py-1 rounded-full backdrop-blur text-sm font-mono border border-gray-600 shadow-lg">
-                    <span id="fullscreen-timer">00:00</span>
-                </div>
-                <div class="w-10"></div>
-            </div>
-
-            <!-- Bottom Controls -->
-            <div class="relative z-10 mt-auto pb-10 flex justify-center gap-6 items-center">
-                <button onclick="toggleSelfCamera()" id="btn-toggle-cam"
-                    class="w-12 h-12 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur hover:bg-gray-600 transition shadow-lg">
-                    <i id="icon-toggle-cam" class="fa-solid fa-video"></i>
-                </button>
-                <button
-                    class="w-12 h-12 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur hover:bg-gray-600 transition shadow-lg">
-                    <i class="fa-solid fa-microphone"></i>
-                </button>
-                <button onclick="endVideoCall()"
-                    class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:scale-105 transition">
-                    <i class="fa-solid fa-phone-slash text-xl"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- 3. Minimized Floating Video Call (PiP) -->
-        <div id="floating-call-box" class="floating-call hidden bg-black">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80"
-                class="w-full h-full object-cover opacity-80 pointer-events-none">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
-            <div class="absolute top-1 left-2 bg-black/50 px-1.5 py-0.5 rounded text-[9px] font-mono"><span
-                    id="float-timer">00:00</span></div>
-            <div class="absolute bottom-2 left-0 w-full flex justify-center gap-3">
-                <button onclick="expandVideoCall()"
-                    class="w-8 h-8 rounded-full bg-gray-700/80 text-white flex items-center justify-center backdrop-blur text-[10px]"><i
-                        class="fa-solid fa-expand"></i></button>
-                <button onclick="endVideoCall()"
-                    class="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg text-[10px]"><i
-                        class="fa-solid fa-phone-slash"></i></button>
-            </div>
-            <div class="absolute top-2 right-2 w-2 h-2 bg-brandGreen rounded-full animate-pulse"></div>
         </div>
 
         <!-- ================= MAIN APP CONTENT ================= -->
@@ -401,18 +349,16 @@
 
                 <header class="flex justify-between items-start relative z-50">
                     <div>
-                        <h1 class="text-xl font-bold tracking-wide">SM <span class="text-brandGreen">CONTROLLER</span>
-                        </h1>
-                        <p class="text-[11px] font-semibold text-brandGreen mt-0.5 tracking-wider">dev: Khandaker shanto
-                        </p>
-                        <p class="text-[9px] text-textGray mt-0.5">Version 1.0.0</p>
+                        <h1 class="text-xl font-bold tracking-wide">SM <span class="text-brandGreen">CONTROLLER</span></h1>
+                        <p class="text-[11px] font-semibold text-brandGreen mt-0.5 tracking-wider">dev: Khandaker shanto</p>
+                        <p id="app-header-version" class="text-[9px] text-textGray mt-0.5 font-mono">Version 1.0.0</p>
                     </div>
 
                     <div class="flex items-center gap-2">
                         <!-- Update Button -->
-                        <button onclick="toggleModal('modal-update')"
+                        <button onclick="openUpdateModalWithSpin()"
                             class="w-11 h-11 rounded-full bg-cardBg flex items-center justify-center text-brandGreen border border-brandGreen/40 subtle-neon-border transition hover:scale-105">
-                            <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                            <i id="header-update-icon" class="fa-solid fa-arrows-rotate text-sm transition-transform"></i>
                         </button>
 
                         <!-- Menu Button -->
@@ -443,8 +389,7 @@
                     </div>
                 </header>
 
-                <div
-                    class="bg-brandGreen text-black rounded-[2rem] p-5 flex flex-col gap-3.5 shadow-[0_10px_30px_rgba(45,212,191,0.25)] relative overflow-hidden">
+                <div class="bg-brandGreen text-black rounded-[2rem] p-5 flex flex-col gap-3.5 shadow-[0_10px_30px_rgba(45,212,191,0.25)] relative overflow-hidden">
                     <div class="flex justify-between items-center z-10">
                         <p class="text-sm font-semibold opacity-85">Your Device ID</p>
                         <div class="flex items-center gap-2 bg-black/10 px-3 py-1 rounded-full">
@@ -462,8 +407,7 @@
 
                     <div class="flex justify-between items-center z-10 pt-2.5 border-t border-black/20">
                         <span id="live-date" class="text-[12px] font-bold opacity-80">28 Sept 2026</span>
-                        <span id="live-time"
-                            class="text-[12px] font-bold font-mono opacity-90 bg-black/10 px-2.5 py-0.5 rounded">12:51:20 PM</span>
+                        <span id="live-time" class="text-[12px] font-bold font-mono opacity-90 bg-black/10 px-2.5 py-0.5 rounded">12:51:20 PM</span>
                     </div>
 
                     <i class="fa-solid fa-satellite-dish absolute -bottom-6 -right-4 text-8xl text-black opacity-5"></i>
@@ -495,11 +439,9 @@
                     </div>
 
                     <div id="recent-devices-list" class="space-y-2.5">
-                        <div id="device-1"
-                            class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
+                        <div id="device-1" class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
                             <div class="flex items-center gap-3.5">
-                                <div
-                                    class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700">
+                                <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700">
                                     <i class="fa-solid fa-mobile-screen"></i>
                                 </div>
                                 <div>
@@ -510,11 +452,9 @@
                             <button onclick="switchTab('remote')" class="text-brandGreen text-xs bg-appBg px-3 py-1.5 rounded-xl border border-brandGreen/30">Connect</button>
                         </div>
 
-                        <div id="device-2"
-                            class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
+                        <div id="device-2" class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
                             <div class="flex items-center gap-3.5">
-                                <div
-                                    class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-gray-400 border border-gray-700">
+                                <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-gray-400 border border-gray-700">
                                     <i class="fa-solid fa-desktop"></i>
                                 </div>
                                 <div>
@@ -531,38 +471,60 @@
             <!-- ================= VIEW 2: SCREEN SHARE (REMOTE) ================= -->
             <div id="view-remote" class="view-section flex-col h-full -mx-5 -mt-8">
                 <div class="relative w-full h-full bg-black flex flex-col min-h-[500px]">
-                    <div
-                        class="absolute top-0 w-full px-5 py-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
-                        <div
-                            class="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-gray-700">
+                    <!-- Top Status Bar -->
+                    <div class="absolute top-0 w-full px-5 py-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
+                        <div class="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-gray-700">
                             <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                             <span class="text-xs font-semibold">Live Session</span>
                         </div>
-                        <span
-                            class="text-xs font-mono text-gray-300 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">04:22</span>
+
+                        <div class="flex items-center gap-2">
+                            <div id="rec-status-pill" style="display: none;" class="hidden items-center gap-1.5 bg-red-500/20 border border-red-500 px-2.5 py-0.5 rounded-full text-[11px] text-red-500 font-bold font-mono">
+                                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                                <span id="rec-timer-text">REC 00:00</span>
+                            </div>
+
+                            <div id="mic-status-pill" style="display: none;" class="hidden items-center gap-1 bg-red-500/20 border border-red-500/50 px-2 py-0.5 rounded-full text-[10px] text-red-500 font-bold">
+                                <i class="fa-solid fa-microphone-slash"></i> MUTED
+                            </div>
+
+                            <span id="remote-session-timer" class="text-xs font-mono text-gray-300 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">04:22</span>
+                        </div>
                     </div>
+
+                    <!-- Stream Image -->
                     <img src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop"
                         class="w-full h-full object-cover opacity-70">
 
-                    <div
-                        class="absolute bottom-28 left-1/2 -translate-x-1/2 bg-cardBg/90 backdrop-blur-xl border border-gray-700 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl z-20">
-                        <button
+                    <!-- Floating Action Toolbar -->
+                    <div class="absolute bottom-28 left-1/2 -translate-x-1/2 bg-cardBg/90 backdrop-blur-xl border border-gray-700 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl z-20">
+                        <!-- 1. Keyboard Button -->
+                        <button onclick="openRemoteKeyboard()" id="btn-remote-keyboard"
                             class="w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
                             <i class="fa-solid fa-keyboard"></i>
                         </button>
-                        <button
+
+                        <!-- 2. Camera Screenshot Button -->
+                        <button onclick="takeScreenshot()"
                             class="w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
                             <i class="fa-solid fa-camera"></i>
                         </button>
-                        <button
-                            class="w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
-                            <i class="fa-solid fa-microphone"></i>
+
+                        <!-- 3. Mic Mute/Unmute Button -->
+                        <button onclick="toggleMic()" id="btn-mic"
+                            class="w-10 h-10 rounded-xl bg-appBg/50 text-brandGreen hover:opacity-80 transition flex items-center justify-center">
+                            <i id="mic-icon" class="fa-solid fa-microphone"></i>
                         </button>
-                        <button onclick="alert('Recording Screen...')"
+
+                        <!-- 4. Video Recording Button -->
+                        <button onclick="toggleScreenRecording()" id="btn-record"
                             class="w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-red-500 transition flex items-center justify-center">
-                            <i class="fa-solid fa-circle-dot"></i>
+                            <i id="record-icon" class="fa-solid fa-circle-dot"></i>
                         </button>
+
                         <div class="w-[1px] h-6 bg-gray-700 mx-1"></div>
+
+                        <!-- Disconnect Button -->
                         <button onclick="switchTab('home')"
                             class="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center">
                             <i class="fa-solid fa-phone-slash"></i>
@@ -585,8 +547,7 @@
                     <!-- Tool 1: File Manager -->
                     <div onclick="toggleModal('modal-file-manager')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-brandGreen/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-brandGreen mb-4 shadow-lg border border-brandGreen/20">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-brandGreen mb-4 shadow-lg border border-brandGreen/20">
                             <i class="fa-solid fa-folder-open text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">File Manager</h4>
@@ -594,10 +555,9 @@
                     </div>
 
                     <!-- Tool 2: Call Logs -->
-                    <div onclick="alert('Call Logs: Showing 4 recent calls.')"
+                    <div onclick="showToast('Call Logs: 4 recent calls synced')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-blue-400/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-blue-400 mb-4 shadow-lg border border-blue-400/20">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-blue-400 mb-4 shadow-lg border border-blue-400/20">
                             <i class="fa-solid fa-phone text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">Call Logs</h4>
@@ -605,10 +565,9 @@
                     </div>
 
                     <!-- Tool 3: Clipboard -->
-                    <div onclick="alert('Clipboard synced with Galaxy S23 Ultra!')"
+                    <div onclick="showToast('Clipboard synced with connected device!')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-orange-400/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-orange-400 mb-4 shadow-lg border border-orange-400/20">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-orange-400 mb-4 shadow-lg border border-orange-400/20">
                             <i class="fa-solid fa-clipboard-list text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">Clipboard</h4>
@@ -618,8 +577,7 @@
                     <!-- Tool 4: Live Chat -->
                     <div onclick="switchTab('chat')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-purple-400/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-purple-400 mb-4 shadow-lg border border-purple-400/20 group-hover:scale-105 transition">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-purple-400 mb-4 shadow-lg border border-purple-400/20 group-hover:scale-105 transition">
                             <i class="fa-solid fa-comment-dots text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">Live Chat</h4>
@@ -627,10 +585,9 @@
                     </div>
 
                     <!-- Tool 5: App Manager -->
-                    <div onclick="alert('App Manager: 5 Applications Managed.')"
+                    <div onclick="showToast('App Manager: 5 Applications Managed')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-yellow-400/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-yellow-400 mb-4 shadow-lg border border-yellow-400/20">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-yellow-400 mb-4 shadow-lg border border-yellow-400/20">
                             <i class="fa-brands fa-google-play text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">App Manager</h4>
@@ -640,8 +597,7 @@
                     <!-- Tool 6: System Shell -->
                     <div onclick="toggleModal('modal-system-shell')"
                         class="bg-cardBg rounded-3xl p-4 subtle-neon-border group cursor-pointer hover:border-cyan-400/60 transition">
-                        <div
-                            class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-cyan-400 mb-4 shadow-lg border border-cyan-400/20">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-cyan-400 mb-4 shadow-lg border border-cyan-400/20">
                             <i class="fa-solid fa-terminal text-lg"></i>
                         </div>
                         <h4 class="font-bold text-sm mb-1 text-white">System Shell</h4>
@@ -661,22 +617,12 @@
                             <div class="relative">
                                 <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
                                     class="w-9 h-9 rounded-full object-cover border border-gray-700">
-                                <span
-                                    class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-brandGreen rounded-full border-2 border-cardBg"></span>
+                                <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-brandGreen rounded-full border-2 border-cardBg"></span>
                             </div>
                             <div>
                                 <h3 class="font-bold text-white text-xs">Galaxy S23 Ultra</h3>
                                 <p class="text-[10px] text-brandGreen">Active now</p>
                             </div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="triggerAudioCall()"
-                                class="w-9 h-9 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700 hover:bg-gray-800 transition"><i
-                                    class="fa-solid fa-phone text-xs"></i></button>
-                            <button onclick="triggerVideoCall()"
-                                class="w-9 h-9 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700 hover:bg-gray-800 transition relative">
-                                <i class="fa-solid fa-video text-xs"></i>
-                            </button>
                         </div>
                     </div>
                 </header>
@@ -703,18 +649,10 @@
 
                 <div class="p-2.5 bg-cardBg border-t border-gray-800 z-10 w-full">
                     <div class="flex items-center gap-2 w-full">
-                        <button onclick="alert('Select document to attach')"
-                            class="w-9 h-9 flex items-center justify-center text-brandGreen hover:bg-gray-800 rounded-full shrink-0"><i
-                                class="fa-solid fa-plus text-base"></i></button>
-                        <button onclick="alert('Select photo from gallery')"
-                            class="w-9 h-9 flex items-center justify-center text-brandGreen hover:bg-gray-800 rounded-full shrink-0"><i
-                                class="fa-regular fa-image text-base"></i></button>
-
                         <div class="flex-1 bg-appBg border border-gray-700 rounded-full flex items-center px-3.5 py-1">
                             <input id="chat-msg-input" type="text" placeholder="Message..."
                                 class="w-full bg-transparent border-none outline-none text-white text-xs py-1" onkeydown="handleChatKey(event)">
                         </div>
-
                         <button onclick="sendChatMessage()"
                             class="w-10 h-10 bg-brandGreen text-black rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition shrink-0"><i
                                 class="fa-solid fa-paper-plane text-xs"></i></button>
@@ -749,7 +687,35 @@
 
     <!-- JavaScript Logics -->
     <script>
+        let currentAppVersion = "1.0.0";
+        let isScreenRecording = false;
+        let recordingTimer = null;
+        let recordingSeconds = 0;
+        let isMicMuted = false;
+
+        function showToast(msg) {
+            const toast = document.getElementById('app-toast');
+            const text = document.getElementById('toast-text');
+            if (!toast || !text) return;
+            text.innerText = msg;
+            toast.classList.remove('hidden');
+            toast.style.display = 'flex';
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.style.display = 'none';
+            }, 2500);
+        }
+
         function startClock() {
+            let sessionSeconds = 262;
+            setInterval(() => {
+                sessionSeconds++;
+                const m = String(Math.floor(sessionSeconds / 60)).padStart(2, '0');
+                const s = String(sessionSeconds % 60).padStart(2, '0');
+                const timerElem = document.getElementById('remote-session-timer');
+                if (timerElem) timerElem.innerText = `${m}:${s}`;
+            }, 1000);
+
             function updateClock() {
                 const now = new Date();
                 const dateOptions = { day: 'numeric', month: 'short', year: 'numeric' };
@@ -810,7 +776,229 @@
             }
         }
 
-        // Strict Online-Only Mode (Offline Blocking)
+        // --- 1. SCREEN RECORDING FEATURE ---
+        function toggleScreenRecording() {
+            const btn = document.getElementById('btn-record');
+            const icon = document.getElementById('record-icon');
+            const pill = document.getElementById('rec-status-pill');
+            const timerText = document.getElementById('rec-timer-text');
+
+            if (!isScreenRecording) {
+                isScreenRecording = true;
+                recordingSeconds = 0;
+                btn.className = 'w-10 h-10 rounded-xl bg-red-500/30 text-red-500 border border-red-500 transition flex items-center justify-center';
+                icon.className = 'fa-solid fa-stop text-red-500';
+                pill.classList.remove('hidden');
+                pill.style.display = 'flex';
+                showToast('🔴 Screen recording started!');
+
+                recordingTimer = setInterval(() => {
+                    recordingSeconds++;
+                    const m = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+                    const s = String(recordingSeconds % 60).padStart(2, '0');
+                    timerText.innerText = `REC ${m}:${s}`;
+                }, 1000);
+            } else {
+                isScreenRecording = false;
+                clearInterval(recordingTimer);
+                btn.className = 'w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-red-500 transition flex items-center justify-center';
+                icon.className = 'fa-solid fa-circle-dot';
+                pill.classList.add('hidden');
+                pill.style.display = 'none';
+
+                const m = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+                const s = String(recordingSeconds % 60).padStart(2, '0');
+                document.getElementById('saved-video-dur').innerText = `${m}:${s}`;
+                document.getElementById('saved-video-name').innerText = `SM_Record_${Date.now().toString().slice(-6)}.mp4`;
+                toggleModal('modal-recording-saved');
+                showToast('🎬 Recording saved to gallery!');
+            }
+        }
+
+        // --- 2. CAMERA SCREENSHOT FEATURE ---
+        function takeScreenshot() {
+            const flash = document.getElementById('shutter-flash');
+            flash.style.opacity = '0.9';
+            setTimeout(() => { flash.style.opacity = '0'; }, 300);
+
+            document.getElementById('screenshot-file-name').innerText = `SM_Screen_${Date.now().toString().slice(-6)}.png`;
+            setTimeout(() => {
+                toggleModal('modal-screenshot');
+                showToast('📸 Screenshot captured!');
+            }, 350);
+        }
+
+        // --- 3. MIC MUTE / UNMUTE FEATURE ---
+        function toggleMic() {
+            isMicMuted = !isMicMuted;
+            const btn = document.getElementById('btn-mic');
+            const icon = document.getElementById('mic-icon');
+            const pill = document.getElementById('mic-status-pill');
+
+            if (isMicMuted) {
+                btn.className = 'w-10 h-10 rounded-xl bg-red-500/20 text-red-500 border border-red-500/50 transition flex items-center justify-center';
+                icon.className = 'fa-solid fa-microphone-slash';
+                pill.classList.remove('hidden');
+                pill.style.display = 'flex';
+                showToast('🔇 Mic Muted (Voice will not transmit)');
+            } else {
+                btn.className = 'w-10 h-10 rounded-xl bg-appBg/50 text-brandGreen hover:opacity-80 transition flex items-center justify-center';
+                icon.className = 'fa-solid fa-microphone';
+                pill.classList.add('hidden');
+                pill.style.display = 'none';
+                showToast('🎙️ Mic Active (Voice transmitting)');
+            }
+        }
+
+        // --- 4. REMOTE KEYBOARD FEATURE ---
+        function openRemoteKeyboard() {
+            toggleModal('modal-remote-keyboard');
+            setTimeout(() => {
+                document.getElementById('remote-key-input').focus();
+            }, 100);
+        }
+
+        function sendRemoteText() {
+            const input = document.getElementById('remote-key-input');
+            const val = input.value.trim();
+            if (!val) return;
+            showToast(`⌨️ Typed: "${val}" sent to remote!`);
+            input.value = '';
+        }
+
+        function sendShortcutKey(keyName) {
+            showToast(`⌨️ Key [${keyName}] sent to remote!`);
+        }
+
+        // --- 5. IN-APP OTA GITHUB UPDATE SCANNER ---
+        function openUpdateModalWithSpin() {
+            const icon = document.getElementById('header-update-icon');
+            if (icon) {
+                icon.classList.add('fa-spin');
+                setTimeout(() => { icon.classList.remove('fa-spin'); }, 800);
+            }
+            toggleModal('modal-update');
+            checkUpdatesOnline();
+        }
+
+        async function checkUpdatesOnline() {
+            const spinIcon = document.getElementById('check-again-icon');
+            if (spinIcon) spinIcon.classList.add('fa-spin');
+
+            document.getElementById('app-current-ver-text').innerText = 'v' + currentAppVersion;
+            document.getElementById('app-header-version').innerText = 'Version ' + currentAppVersion;
+
+            try {
+                const res = await fetch('https://raw.githubusercontent.com/shantocnits/sm-remote-controller/main/version.json?t=' + Date.now());
+                if (res.ok) {
+                    const data = await res.json();
+                    const latestVer = data.version || '1.0.0';
+                    const tag = document.getElementById('github-latest-ver-text');
+                    if (tag) tag.innerText = 'v' + latestVer;
+
+                    if (data.changelog && Array.isArray(data.changelog)) {
+                        const changelogBox = document.getElementById('changelog-container');
+                        if (changelogBox) {
+                            changelogBox.innerHTML = data.changelog.map(item => `<p>• ${item}</p>`).join('');
+                        }
+                    }
+
+                    if (latestVer !== currentAppVersion) {
+                        const statusTag = document.getElementById('update-status-tag');
+                        if (statusTag) statusTag.innerText = '🔥 New Update Available (v' + latestVer + ')';
+                        const actionContainer = document.getElementById('update-action-container');
+                        if (actionContainer) {
+                            actionContainer.innerHTML = `
+                                <button onclick="triggerUpdateDownload('${latestVer}', '${data.downloadUrl || ''}')" class="w-full py-3 rounded-xl bg-brandGreen text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
+                                    <i class="fa-solid fa-download"></i> Update Now (v${latestVer})
+                                </button>
+                            `;
+                        }
+                    } else {
+                        renderUpToDateState(currentAppVersion);
+                    }
+                }
+            } catch (e) {
+                renderUpToDateState(currentAppVersion);
+            } finally {
+                setTimeout(() => {
+                    if (spinIcon) spinIcon.classList.remove('fa-spin');
+                }, 600);
+            }
+        }
+
+        function renderUpToDateState(ver) {
+            const statusTag = document.getElementById('update-status-tag');
+            if (statusTag) statusTag.innerText = '✓ You are on latest version';
+            const actionContainer = document.getElementById('update-action-container');
+            if (actionContainer) {
+                actionContainer.innerHTML = `
+                    <div class="w-full py-2.5 rounded-xl bg-brandGreen/10 border border-brandGreen/30 text-center text-brandGreen text-xs font-bold flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> You are on the latest version (v${ver})
+                    </div>
+                `;
+            }
+        }
+
+        function simulateNewUpdateAvailable() {
+            const nextVer = '1.1.0';
+            document.getElementById('github-latest-ver-text').innerText = 'v' + nextVer;
+            document.getElementById('update-status-tag').innerText = '🔥 New Update Available (v' + nextVer + ')';
+            document.getElementById('changelog-container').innerHTML = `
+                <p>• 🚀 New: Live Screen Recording with auto MP4 export</p>
+                <p>• 📸 New: Camera Shutter Flash & Screenshot gallery preview</p>
+                <p>• 🎙️ New: Real-time Mic Mute / Voice transmission toggle</p>
+                <p>• ⌨️ New: Remote Virtual Keyboard & PC Shortcut Key tray</p>
+                <p>• ⚡ Ultra-low latency video stream & bug fixes</p>
+            `;
+            document.getElementById('update-action-container').innerHTML = `
+                <button onclick="triggerUpdateDownload('${nextVer}')" class="w-full py-3 rounded-xl bg-brandGreen text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
+                    <i class="fa-solid fa-download"></i> Update Now (v${nextVer})
+                </button>
+            `;
+            showToast('Simulated v1.1.0 update available!');
+        }
+
+        function triggerUpdateDownload(targetVer = '1.1.0', downloadUrl = '') {
+            const progressBox = document.getElementById('update-progress-box');
+            const progressBar = document.getElementById('update-progress-bar');
+            const progressText = document.getElementById('update-progress-text');
+            const actionContainer = document.getElementById('update-action-container');
+            const statusTag = document.getElementById('update-status-tag');
+
+            progressBox.classList.remove('hidden');
+            progressBox.style.display = 'block';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 25;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    progressBar.style.width = '100%';
+                    progressText.innerText = '100%';
+                    setTimeout(() => {
+                        progressBox.classList.add('hidden');
+                        progressBox.style.display = 'none';
+
+                        // Apply new version!
+                        currentAppVersion = targetVer;
+                        document.getElementById('app-current-ver-text').innerText = 'v' + targetVer;
+                        document.getElementById('app-header-version').innerText = 'Version ' + targetVer;
+                        if (statusTag) statusTag.innerText = '✓ You are on latest version';
+                        renderUpToDateState(targetVer);
+                        showToast(`🎉 App successfully updated to v${targetVer}!`);
+
+                        if (downloadUrl) {
+                            window.open(downloadUrl, '_blank');
+                        }
+                    }, 400);
+                } else {
+                    progressBar.style.width = progress + '%';
+                    progressText.innerText = progress + '%';
+                }
+            }, 250);
+        }
+
         function checkOnlineStatus() {
             const overlay = document.getElementById('offline-blocking-overlay');
             if (!overlay) return;
@@ -824,75 +1012,10 @@
         }
         window.addEventListener('online', checkOnlineStatus);
         window.addEventListener('offline', checkOnlineStatus);
-        setInterval(checkOnlineStatus, 1500);
+        setInterval(checkOnlineStatus, 2000);
 
-        // Auto OTA Update Check on Startup
         async function autoCheckUpdatesOnStart() {
-            if (!navigator.onLine) return;
-            try {
-                const res = await fetch('https://raw.githubusercontent.com/shantocnits/sm-remote-controller/main/version.json?t=' + Date.now());
-                if (res.ok) {
-                    const data = await res.json();
-                    const currentVer = '1.0.0';
-                    const latestVer = data.version || '1.0.0';
-                    const tag = document.getElementById('github-latest-ver-text');
-                    if (tag) tag.innerText = 'v' + latestVer;
-
-                    if (data.changelog && Array.isArray(data.changelog)) {
-                        const changelogBox = document.getElementById('changelog-container');
-                        if (changelogBox) {
-                            changelogBox.innerHTML = data.changelog.map(item => `<p>• ${item}</p>`).join('');
-                        }
-                    }
-
-                    if (latestVer !== currentVer) {
-                        const statusTag = document.getElementById('update-status-tag');
-                        if (statusTag) statusTag.innerText = '🔥 New Update Available (v' + latestVer + ')';
-                        const actionContainer = document.getElementById('update-action-container');
-                        if (actionContainer) {
-                            actionContainer.innerHTML = `
-                                <button onclick="triggerUpdateDownload()" class="w-full py-3 rounded-xl bg-brandGreen text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
-                                    <i class="fa-solid fa-download"></i> Update Now
-                                </button>
-                            `;
-                        }
-                    }
-                }
-            } catch (e) {}
-        }
-
-        function triggerUpdateDownload() {
-            const progressBox = document.getElementById('update-progress-box');
-            const progressBar = document.getElementById('update-progress-bar');
-            const progressText = document.getElementById('update-progress-text');
-            const actionContainer = document.getElementById('update-action-container');
-            const statusTag = document.getElementById('update-status-tag');
-
-            progressBox.classList.remove('hidden');
-            progressBox.style.display = 'block';
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 20;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                    progressBar.style.width = '100%';
-                    progressText.innerText = '100%';
-                    setTimeout(() => {
-                        progressBox.classList.add('hidden');
-                        progressBox.style.display = 'none';
-                        if (statusTag) statusTag.innerText = '✓ You are on latest version';
-                        actionContainer.innerHTML = `
-                            <div class="w-full py-2.5 rounded-xl bg-brandGreen/10 border border-brandGreen/30 text-center text-brandGreen text-xs font-bold flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-check"></i> You are on the latest version (v1.0.0)
-                            </div>
-                        `;
-                    }, 400);
-                } else {
-                    progressBar.style.width = progress + '%';
-                    progressText.innerText = progress + '%';
-                }
-            }, 300);
+            checkUpdatesOnline();
         }
 
         function setMode(mode, btnElement) {
@@ -918,7 +1041,7 @@
         function copyDeviceId() {
             const text = document.getElementById('my-device-id').innerText;
             navigator.clipboard.writeText(text);
-            alert('Device ID: ' + text + ' copied to clipboard!');
+            showToast('Device ID: ' + text + ' copied!');
         }
 
         function pastePartnerId() {
@@ -935,7 +1058,6 @@
             }
         }
 
-        // Live Chat Messages
         function sendChatMessage() {
             const input = document.getElementById('chat-msg-input');
             const val = input.value.trim();
@@ -962,111 +1084,6 @@
 
         function handleChatKey(e) {
             if (e.key === 'Enter') sendChatMessage();
-        }
-
-        // System Shell
-        function executeShellCmd() {
-            const input = document.getElementById('shell-input');
-            const cmd = input.value.trim();
-            if (!cmd) return;
-
-            const output = document.getElementById('shell-output');
-            output.innerHTML += `<p class="text-white font-bold">$ ${cmd}</p>`;
-
-            const lower = cmd.toLowerCase();
-            if (lower === 'help') {
-                output.innerHTML += `<p class="text-gray-300">Commands: status, info, ping, ls, clear, help</p>`;
-            } else if (lower === 'status') {
-                output.innerHTML += `<p class="text-brandGreen">Device: Galaxy S23 Ultra | Battery: 84% | Status: Connected</p>`;
-            } else if (lower === 'ping') {
-                output.innerHTML += `<p class="text-brandGreen">64 bytes from partner: seq=1 time=14.2ms avg=13.5ms</p>`;
-            } else if (lower === 'clear') {
-                output.innerHTML = '';
-            } else {
-                output.innerHTML += `<p class="text-red-400">bash: ${cmd}: command not found</p>`;
-            }
-
-            input.value = '';
-            output.scrollTop = output.scrollHeight;
-        }
-
-        function handleShellKey(e) {
-            if (e.key === 'Enter') executeShellCmd();
-        }
-
-        // Video Call
-        let videoCallTimer = null, videoSeconds = 0;
-        function triggerVideoCall() {
-            document.getElementById('video-ringing-overlay').classList.remove('hidden');
-            setTimeout(() => {
-                document.getElementById('video-ringing-overlay').classList.add('hidden');
-                document.getElementById('fullscreen-video-call').classList.remove('hidden');
-                videoSeconds = 0;
-                videoCallTimer = setInterval(() => {
-                    videoSeconds++;
-                    const timeStr = String(Math.floor(videoSeconds / 60)).padStart(2, '0') + ':' + String(videoSeconds % 60).padStart(2, '0');
-                    document.getElementById('fullscreen-timer').innerText = timeStr;
-                    document.getElementById('float-timer').innerText = timeStr;
-                }, 1000);
-            }, 1500);
-        }
-
-        function minimizeVideoCall() {
-            document.getElementById('fullscreen-video-call').classList.add('hidden');
-            document.getElementById('floating-call-box').classList.remove('hidden');
-        }
-
-        function expandVideoCall() {
-            document.getElementById('floating-call-box').classList.add('hidden');
-            document.getElementById('fullscreen-video-call').classList.remove('hidden');
-        }
-
-        function endVideoCall() {
-            clearInterval(videoCallTimer);
-            document.getElementById('video-ringing-overlay').classList.add('hidden');
-            document.getElementById('fullscreen-video-call').classList.add('hidden');
-            document.getElementById('floating-call-box').classList.add('hidden');
-        }
-
-        function triggerAudioCall() {
-            alert('Calling Galaxy S23 Ultra (Audio Call)... Connected!');
-        }
-
-        function toggleSelfCamera() {
-            const cam = document.getElementById('self-camera-view');
-            cam.classList.toggle('hidden');
-        }
-
-        function triggerUpdateDownload() {
-            const progressBox = document.getElementById('update-progress-box');
-            const progressBar = document.getElementById('update-progress-bar');
-            const progressText = document.getElementById('update-progress-text');
-            const actionContainer = document.getElementById('update-action-container');
-            const statusTag = document.getElementById('update-status-tag');
-
-            progressBox.classList.remove('hidden');
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 20;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                    progressBar.style.width = '100%';
-                    progressText.innerText = '100%';
-                    setTimeout(() => {
-                        progressBox.classList.add('hidden');
-                        if (statusTag) statusTag.innerText = '✓ You are on latest version';
-                        actionContainer.innerHTML = `
-                            <div class="w-full py-2.5 rounded-xl bg-brandGreen/10 border border-brandGreen/30 text-center text-brandGreen text-xs font-bold flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-check"></i> You are on the latest version (v1.0.0)
-                            </div>
-                        `;
-                    }, 400);
-                } else {
-                    progressBar.style.width = progress + '%';
-                    progressText.innerText = progress + '%';
-                }
-            }, 300);
         }
     </script>
 </body>
