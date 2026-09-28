@@ -18,9 +18,20 @@ export interface ChatMessage {
   time: string;
   isVoice?: boolean;
   voiceDuration?: string;
+  imageUrl?: string;
+  fileName?: string;
+  fileSize?: string;
   isDelivered?: boolean;
 }
 
 export type VideoCallStatus = 'idle' | 'ringing' | 'connected' | 'minimized';
 
 export type AudioCallStatus = 'idle' | 'ringing' | 'connected';
+
+export type ActiveToolModal =
+  | 'none'
+  | 'file-manager'
+  | 'call-logs'
+  | 'clipboard'
+  | 'app-manager'
+  | 'system-shell';

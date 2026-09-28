@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Colors } from './src/theme/colors';
+import { OfflineBlockingOverlay } from './src/components/common/OfflineBlockingOverlay';
 
 const App: React.FC = () => {
   return (
@@ -11,10 +12,11 @@ const App: React.FC = () => {
       <SafeAreaProvider>
         <StatusBar
           barStyle="light-content"
-          backgroundColor={Colors.appBg}
+          backgroundColor="transparent"
           translucent
         />
         <AppNavigator />
+        <OfflineBlockingOverlay />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -28,3 +30,4 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+

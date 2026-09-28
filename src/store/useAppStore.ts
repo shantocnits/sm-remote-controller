@@ -55,6 +55,8 @@ interface AppStoreState {
 
   // Chat & Voice Actions
   sendMessage: (text: string) => void;
+  sendImageMessage: (imageUrl: string, caption?: string) => void;
+  sendFileMessage: (fileName: string, fileSize: string) => void;
   startVoiceRecording: () => void;
   cancelVoiceRecording: () => void;
   sendVoiceRecording: () => void;
@@ -120,7 +122,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   // Mode selection: dynamic tab hiding logic
   setMode: (mode: AppMode) => {
     const currentTab = get().activeTab;
-    // If switching to non-m2m and currently on tools, redirect to home
     const newTab = mode !== 'm2m' && currentTab === 'tools' ? 'home' : currentTab;
     set({
       currentMode: mode,
@@ -148,7 +149,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         d.id === id ? { ...d, isPinned: !d.isPinned } : d
       );
 
-      // Pinned items bubble to top
       const sorted = [...updated].sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
@@ -208,6 +208,34 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set((state) => ({ messages: [...state.messages, newMsg] }));
   },
 
+  sendImageMessage: (imageUrl: string, caption?: string) => {
+    const now = new Date();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newMsg: ChatMessage = {
+      id: `msg-img-${Date.now()}`,
+      sender: 'self',
+      imageUrl,
+      text: caption,
+      time,
+      isDelivered: true,
+    };
+    set((state) => ({ messages: [...state.messages, newMsg] }));
+  },
+
+  sendFileMessage: (fileName: string, fileSize: string) => {
+    const now = new Date();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newMsg: ChatMessage = {
+      id: `msg-file-${Date.now()}`,
+      sender: 'self',
+      fileName,
+      fileSize,
+      time,
+      isDelivered: true,
+    };
+    set((state) => ({ messages: [...state.messages, newMsg] }));
+  },
+
   startVoiceRecording: () =>
     set({ isVoiceRecording: true, voiceSeconds: 0 }),
 
@@ -216,8 +244,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   sendVoiceRecording: () => {
     const { voiceSeconds } = get();
-    const minutes = Math.floor(voiceSeconds / 60);
-    const secs = voiceSeconds % 60;
+    const durationSec = Math.max(voiceSeconds, 3);
+    const minutes = Math.floor(durationSec / 60);
+    const secs = durationSec % 60;
     const voiceDuration = `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     const now = new Date();
     const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

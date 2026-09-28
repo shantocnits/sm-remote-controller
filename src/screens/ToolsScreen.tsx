@@ -1,18 +1,23 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { ToolsHeader } from '../components/tools/ToolsHeader';
 import { ToolGridItem, ToolItemData } from '../components/tools/ToolGridItem';
+import { ToolsSearchModal } from '../components/tools/ToolsSearchModal';
+import { FileManagerModal } from '../components/tools/FileManagerModal';
+import { CallLogsModal } from '../components/tools/CallLogsModal';
+import { ClipboardModal } from '../components/tools/ClipboardModal';
+import { AppManagerModal } from '../components/tools/AppManagerModal';
+import { SystemShellModal } from '../components/tools/SystemShellModal';
 import { useAppStore } from '../store/useAppStore';
+import { ActiveToolModal } from '../types';
 
 export const ToolsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveTab } = useAppStore();
-
-  const handleToolPress = (toolName: string) => {
-    Alert.alert(toolName, `${toolName} module initialized.`);
-  };
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<ActiveToolModal>('none');
 
   const tools: ToolItemData[] = [
     {
@@ -21,7 +26,7 @@ export const ToolsScreen: React.FC = () => {
       subtitle: 'Access Gallery & Storage',
       icon: 'folder',
       iconColor: Colors.iconFolder,
-      onPress: () => handleToolPress('File Manager'),
+      onPress: () => setActiveModal('file-manager'),
     },
     {
       id: 'call-logs',
@@ -29,15 +34,15 @@ export const ToolsScreen: React.FC = () => {
       subtitle: 'View Call History',
       icon: 'phone',
       iconColor: Colors.iconPhone,
-      onPress: () => handleToolPress('Call Logs'),
+      onPress: () => setActiveModal('call-logs'),
     },
     {
       id: 'clipboard',
       title: 'Clipboard',
-      subtitle: 'Copy, Paste & Sync',
+      subtitle: 'Copy, Paste & File Sync',
       icon: 'clipboard',
       iconColor: Colors.iconClipboard,
-      onPress: () => handleToolPress('Clipboard & Transfer'),
+      onPress: () => setActiveModal('clipboard'),
     },
     {
       id: 'live-chat',
@@ -45,7 +50,7 @@ export const ToolsScreen: React.FC = () => {
       subtitle: 'Send Text & Voice Msg',
       icon: 'chat',
       iconColor: Colors.iconChat,
-      onPress: () => setActiveTab('chat'), // Directly navigates to Chat tab
+      onPress: () => setActiveTab('chat'), // Directly navigates to Messenger-style Live Chat
     },
     {
       id: 'app-manager',
@@ -53,7 +58,7 @@ export const ToolsScreen: React.FC = () => {
       subtitle: 'Manage Installed Apps',
       icon: 'apps',
       iconColor: Colors.iconApps,
-      onPress: () => handleToolPress('App Manager'),
+      onPress: () => setActiveModal('app-manager'),
     },
     {
       id: 'system-shell',
@@ -61,7 +66,7 @@ export const ToolsScreen: React.FC = () => {
       subtitle: 'Remote Terminal Access',
       icon: 'terminal',
       iconColor: Colors.iconTerminal,
-      onPress: () => handleToolPress('System Shell'),
+      onPress: () => setActiveModal('system-shell'),
     },
   ];
 
@@ -70,7 +75,7 @@ export const ToolsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <ToolsHeader onSearchPress={() => handleToolPress('Search Tools')} />
+        <ToolsHeader onSearchPress={() => setIsSearchOpen(true)} />
 
         <View style={styles.grid}>
           {tools.map((tool) => (
@@ -78,6 +83,40 @@ export const ToolsScreen: React.FC = () => {
           ))}
         </View>
       </ScrollView>
+
+      {/* Search Popup / Modal */}
+      <ToolsSearchModal
+        visible={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        tools={tools}
+        onSelectTool={(tool) => tool.onPress()}
+      />
+
+      {/* Dynamic Tool Modals */}
+      <FileManagerModal
+        visible={activeModal === 'file-manager'}
+        onClose={() => setActiveModal('none')}
+      />
+
+      <CallLogsModal
+        visible={activeModal === 'call-logs'}
+        onClose={() => setActiveModal('none')}
+      />
+
+      <ClipboardModal
+        visible={activeModal === 'clipboard'}
+        onClose={() => setActiveModal('none')}
+      />
+
+      <AppManagerModal
+        visible={activeModal === 'app-manager'}
+        onClose={() => setActiveModal('none')}
+      />
+
+      <SystemShellModal
+        visible={activeModal === 'system-shell'}
+        onClose={() => setActiveModal('none')}
+      />
     </View>
   );
 };
@@ -88,12 +127,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.appBg,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 110,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    justifyContent: 'space-between',
+    width: '100%',
   },
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -18,7 +19,7 @@ import { useAppStore } from '../store/useAppStore';
 export const RemoteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveTab } = useAppStore();
-  const [sessionSeconds, setSessionSeconds] = useState(262); // 04:22 start
+  const [sessionSeconds, setSessionSeconds] = useState(262); // 04:22
   const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
@@ -48,16 +49,28 @@ export const RemoteScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Full-Screen Stream Background Image matching index.html */}
+      <Image
+        source={{
+          uri: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop',
+        }}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
+
+      {/* Subtle dark gradient overlay */}
+      <View style={styles.darkOverlay} />
 
       {/* Top Session Status Bar */}
       <View
         style={[
           styles.topHeader,
-          { paddingTop: Math.max(insets.top + 8, 16) },
+          { paddingTop: Math.max(insets.top + 8, 20) },
         ]}>
         <View style={styles.liveBadge}>
-          <LivePulseBadge color={Colors.dangerRed} size={6} />
+          <LivePulseBadge color={Colors.dangerRed} size={8} />
           <Text style={[Typography.caption, styles.liveText]}>Live Session</Text>
         </View>
 
@@ -68,10 +81,10 @@ export const RemoteScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Remote Device Canvas Simulator */}
-      <View style={styles.canvasContainer}>
-        <View style={styles.feedBox}>
-          <VectorIcon name="desktop" size={64} color="rgba(45, 212, 191, 0.3)" />
+      {/* Center Device Stream Information Info */}
+      <View style={styles.centerInfo}>
+        <View style={styles.feedCard}>
+          <VectorIcon name="desktop" size={48} color={Colors.brandGreen} />
           <Text style={[Typography.bodyMedium, styles.feedText]}>
             Connected to Galaxy S23 Ultra
           </Text>
@@ -130,6 +143,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.65,
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -162,30 +183,35 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: Colors.textSecondary,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
-  canvasContainer: {
+  centerInfo: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
-  feedBox: {
-    width: '100%',
-    height: '75%',
-    backgroundColor: '#0c0f14',
+  feedCard: {
+    backgroundColor: 'rgba(12, 15, 20, 0.75)',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.2)',
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+    paddingVertical: 24,
+    paddingHorizontal: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
   feedText: {
     color: Colors.textWhite,
-    marginTop: 16,
+    marginTop: 14,
+    fontWeight: '700',
+    fontSize: 15,
   },
   subFeedText: {
     color: Colors.brandGreen,
     marginTop: 4,
+    fontSize: 12,
   },
   toolbarWrapper: {
     position: 'absolute',

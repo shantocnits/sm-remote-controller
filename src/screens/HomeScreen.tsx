@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Header } from '../components/common/Header';
@@ -19,6 +20,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Device } from '../types';
 
 export const HomeScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { devices, clearDevices, setActiveTab } = useAppStore();
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -62,7 +64,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top + 6, 14) }]}>
       <Header />
       <ModeDropdown />
 

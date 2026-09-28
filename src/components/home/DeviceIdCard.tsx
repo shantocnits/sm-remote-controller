@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ToastAndroid, Platform, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { VectorIcon } from '../common/VectorIcon';
 import { LivePulseBadge } from '../common/LivePulseBadge';
 import { useAppStore } from '../../store/useAppStore';
 import { formatCurrentDate, formatCurrentTime } from '../../utils/dateUtils';
+import { getDeviceId, copyTextToClipboard } from '../../utils/deviceUtils';
 
 export const DeviceIdCard: React.FC = () => {
   const { currentMode } = useAppStore();
+  const [deviceId] = useState<string>(getDeviceId());
   const [liveDate, setLiveDate] = useState(formatCurrentDate());
   const [liveTime, setLiveTime] = useState(formatCurrentTime());
 
@@ -20,13 +22,8 @@ export const DeviceIdCard: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const copyToClipboard = () => {
-    const msg = 'Device ID: 948 201 copied!';
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(msg, ToastAndroid.SHORT);
-    } else {
-      Alert.alert('Copied', msg);
-    }
+  const handleCopy = () => {
+    copyTextToClipboard(deviceId, 'Device ID');
   };
 
   const modeLabel = currentMode === 'm2m' ? 'Mobile Mode' : 'Desktop Mode';
@@ -44,12 +41,12 @@ export const DeviceIdCard: React.FC = () => {
 
       {/* Device ID and Copy */}
       <View style={styles.idRow}>
-        <Text style={[Typography.monoHeading, styles.idText]}>948 201</Text>
+        <Text style={[Typography.monoHeading, styles.idText]}>{deviceId}</Text>
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={copyToClipboard}
+          onPress={handleCopy}
           style={styles.copyButton}>
-          <VectorIcon name="copy" size={18} color="#000000" />
+          <VectorIcon name="copy" size={20} color="#000000" />
         </TouchableOpacity>
       </View>
 
@@ -117,6 +114,9 @@ const styles = StyleSheet.create({
   },
   idText: {
     color: '#000000',
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   copyButton: {
     width: 44,
@@ -151,6 +151,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     opacity: 0.9,
     fontSize: 12,
+    fontWeight: '700',
   },
   watermark: {
     position: 'absolute',

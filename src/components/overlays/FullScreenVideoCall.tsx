@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   StyleSheet,
   Modal,
   StatusBar,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
@@ -14,6 +17,8 @@ import { Shadows } from '../../theme/shadows';
 import { VectorIcon } from '../common/VectorIcon';
 import { useAppStore } from '../../store/useAppStore';
 import { formatSecondsToTimer } from '../../utils/timerUtils';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const FullScreenVideoCall: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -27,6 +32,35 @@ export const FullScreenVideoCall: React.FC = () => {
     toggleSelfCamera,
   } = useAppStore();
 
+  // Draggable Self-Camera PanResponder
+  const selfCamPan = useRef(
+    new Animated.ValueXY({
+      x: SCREEN_WIDTH - 120,
+      y: 100,
+    })
+  ).current;
+
+  const selfCamPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        selfCamPan.setOffset({
+          x: (selfCamPan.x as any)._value,
+          y: (selfCamPan.y as any)._value,
+        });
+        selfCamPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: selfCamPan.x, dy: selfCamPan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => {
+        selfCamPan.flattenOffset();
+      },
+    })
+  ).current;
+
   useEffect(() => {
     if (videoCallStatus !== 'connected') return;
     const interval = setInterval(() => {
@@ -39,7 +73,7 @@ export const FullScreenVideoCall: React.FC = () => {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={minimizeVideoCall}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <View style={styles.container}>
         {/* Background Simulated Feed */}
         <View style={styles.remoteFeed}>
@@ -49,14 +83,22 @@ export const FullScreenVideoCall: React.FC = () => {
           </Text>
         </View>
 
-        {/* Self-Camera View (Top Right) */}
+        {/* Draggable Self-Camera View */}
         {isSelfCameraOn && (
-          <View style={[styles.selfCameraBox, Shadows.cardShadow]}>
+          <Animated.View
+            {...selfCamPanResponder.panHandlers}
+            style={[
+              styles.selfCameraBox,
+              Shadows.cardShadow,
+              {
+                transform: [{ translateX: selfCamPan.x }, { translateY: selfCamPan.y }],
+              },
+            ]}>
             <View style={styles.selfCameraFeed}>
               <VectorIcon name="camera" size={24} color={Colors.brandGreen} />
               <Text style={styles.selfLabel}>Self Camera</Text>
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* Top Controls Bar */}
@@ -135,16 +177,17 @@ const styles = StyleSheet.create({
   },
   selfCameraBox: {
     position: 'absolute',
-    top: 90,
-    right: 20,
-    width: 96,
-    height: 140,
-    borderRadius: 16,
+    top: 0,
+    left: 0,
+    width: 100,
+    height: 145,
+    borderRadius: 18,
     backgroundColor: '#1f242d',
     borderWidth: 2,
     borderColor: Colors.borderMuted,
     overflow: 'hidden',
     zIndex: 30,
+    elevation: 15,
   },
   selfCameraFeed: {
     flex: 1,

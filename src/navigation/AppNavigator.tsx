@@ -9,6 +9,7 @@ import { FloatingBottomNav } from '../components/navigation/FloatingBottomNav';
 import { VideoRingingModal } from '../components/overlays/VideoRingingModal';
 import { FullScreenVideoCall } from '../components/overlays/FullScreenVideoCall';
 import { PipVideoCall } from '../components/overlays/PipVideoCall';
+import { OfflineNotice } from '../components/common/OfflineNotice';
 import { useAppStore } from '../store/useAppStore';
 
 export const AppNavigator: React.FC = () => {
@@ -41,6 +42,9 @@ export const AppNavigator: React.FC = () => {
       <VideoRingingModal />
       <FullScreenVideoCall />
       <PipVideoCall />
+
+      {/* Offline Alert Notice */}
+      <OfflineNotice />
     </View>
   );
 };

@@ -6,6 +6,7 @@ import { Shadows } from '../../theme/shadows';
 import { VectorIcon } from '../common/VectorIcon';
 import { NeonCard } from '../common/NeonCard';
 import { useAppStore } from '../../store/useAppStore';
+import { getClipboardText } from '../../utils/deviceUtils';
 
 export const RemoteConnectCard: React.FC = () => {
   const { partnerIdInput, setPartnerIdInput, setActiveTab } = useAppStore();
@@ -14,11 +15,25 @@ export const RemoteConnectCard: React.FC = () => {
     setActiveTab('remote');
   };
 
+  const handlePasteClipboard = async () => {
+    const text = await getClipboardText();
+    if (text) {
+      // If it contains "ID: XXX" extract or set directly
+      const clean = text.replace(/[^0-9\s]/g, '').trim();
+      setPartnerIdInput(clean || text.trim());
+    }
+  };
+
   return (
     <NeonCard style={styles.card}>
-      <Text style={[Typography.bodyMedium, styles.title]}>
-        Control Remote Device
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={[Typography.bodyMedium, styles.title]}>
+          Control Remote Device
+        </Text>
+        <TouchableOpacity activeOpacity={0.7} onPress={handlePasteClipboard}>
+          <Text style={styles.pasteText}>Paste</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.inputRow}>
         <View style={styles.inputWrapper}>
@@ -49,9 +64,19 @@ const styles = StyleSheet.create({
     padding: 20,
     marginTop: 14,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   title: {
     color: Colors.textSecondary,
-    marginBottom: 12,
+  },
+  pasteText: {
+    color: Colors.brandGreen,
+    fontSize: 12,
+    fontWeight: '700',
   },
   inputRow: {
     flexDirection: 'row',

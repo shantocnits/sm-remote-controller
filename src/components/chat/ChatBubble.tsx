@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { VectorIcon } from '../common/VectorIcon';
@@ -11,6 +11,40 @@ interface ChatBubbleProps {
 
 export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
   const isSelf = message.sender === 'self';
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playProgress, setPlayProgress] = useState(0);
+
+  useEffect(() => {
+    let timer: any = null;
+    if (isPlaying) {
+      timer = setInterval(() => {
+        setPlayProgress((p) => {
+          if (p >= 100) {
+            setIsPlaying(false);
+            return 0;
+          }
+          return p + 20;
+        });
+      }, 500);
+    } else {
+      setPlayProgress(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isPlaying]);
+
+  const togglePlayVoice = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleFilePress = () => {
+    Alert.alert(
+      message.fileName || 'Attachment',
+      `Size: ${message.fileSize || '1.5 MB'}\nStatus: Downloaded and verified.`,
+      [{ text: 'Open File', onPress: () => {} }, { text: 'Close', style: 'cancel' }]
+    );
+  };
 
   return (
     <View style={[styles.row, isSelf ? styles.selfRow : styles.partnerRow]}>
@@ -27,24 +61,77 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
             isSelf ? styles.selfBubble : styles.partnerBubble,
           ]}>
           {message.isVoice ? (
-            <View style={styles.voiceNoteRow}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={togglePlayVoice}
+              style={styles.voiceNoteRow}>
               <View
                 style={[
                   styles.voicePlayBtn,
                   isSelf ? styles.voicePlayBtnSelf : styles.voicePlayBtnPartner,
                 ]}>
                 <Text style={isSelf ? styles.playIconSelf : styles.playIconPartner}>
-                  ▶
+                  {isPlaying ? '❚❚' : '▶'}
                 </Text>
               </View>
-              <Text
-                style={[
-                  Typography.monoTimer,
-                  isSelf ? styles.selfText : styles.partnerText,
-                ]}>
-                Voice message ({message.voiceDuration || '00:04'})
-              </Text>
+
+              <View style={styles.voiceInfo}>
+                <Text
+                  style={[
+                    styles.voiceDurationText,
+                    isSelf ? styles.selfText : styles.partnerText,
+                  ]}>
+                  Voice message ({message.voiceDuration || '00:04'})
+                </Text>
+                {/* Simulated Audio Waveform / Progress */}
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${isPlaying ? playProgress : 100}%`,
+                        backgroundColor: isSelf ? '#000000' : Colors.brandGreen,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            </TouchableOpacity>
+          ) : message.imageUrl ? (
+            <View style={styles.imageWrapper}>
+              <Image
+                source={{ uri: message.imageUrl }}
+                style={styles.chatImage}
+                resizeMode="cover"
+              />
+              {message.text ? (
+                <Text
+                  style={[
+                    Typography.bodyRegular,
+                    styles.imageCaption,
+                    isSelf ? styles.selfText : styles.partnerText,
+                  ]}>
+                  {message.text}
+                </Text>
+              ) : null}
             </View>
+          ) : message.fileName ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleFilePress}
+              style={styles.fileCard}>
+              <View style={styles.fileIconBox}>
+                <VectorIcon name="clipboard" size={16} color={Colors.brandGreen} />
+              </View>
+              <View style={styles.fileTextCol}>
+                <Text
+                  style={[styles.fileNameText, isSelf ? styles.selfText : styles.partnerText]}
+                  numberOfLines={1}>
+                  {message.fileName}
+                </Text>
+                <Text style={styles.fileSizeText}>{message.fileSize || 'File Document'}</Text>
+              </View>
+            </TouchableOpacity>
           ) : (
             <Text
               style={[
@@ -93,7 +180,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   bubbleCol: {
-    maxWidth: '75%',
+    maxWidth: '78%',
   },
   selfBubbleCol: {
     alignItems: 'flex-end',
@@ -148,11 +235,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minWidth: 180,
   },
   voicePlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -165,9 +253,68 @@ const styles = StyleSheet.create({
   playIconSelf: {
     color: '#000000',
     fontSize: 12,
+    fontWeight: '800',
   },
   playIconPartner: {
     color: Colors.brandGreen,
     fontSize: 12,
+    fontWeight: '800',
+  },
+  voiceInfo: {
+    flex: 1,
+  },
+  voiceDurationText: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  progressBarBg: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  imageWrapper: {
+    overflow: 'hidden',
+    borderRadius: 12,
+  },
+  chatImage: {
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+  },
+  imageCaption: {
+    marginTop: 6,
+  },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 160,
+  },
+  fileIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileTextCol: {
+    flex: 1,
+  },
+  fileNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  fileSizeText: {
+    fontSize: 10,
+    opacity: 0.7,
+    marginTop: 2,
   },
 });

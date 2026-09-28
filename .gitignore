@@ -18,6 +18,12 @@ ios/build/
 *.bundle
 *.jsbundle
 
+# Executables & Binaries (Large files >100MB)
+*.apk
+*.exe
+desktop-app/browser-data/
+desktop-app/browser-profile/
+
 # Temporary scratch
 scratch/
 test-bundle.js

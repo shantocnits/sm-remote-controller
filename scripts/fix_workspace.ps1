@@ -1,14 +1,15 @@
-$base = "D:\Panel\My-app\sm-remote-controller\android\.gradle\8.10.2\dependencies-accessors"
-$src = Join-Path $base "569c8b261a8a714d7731d5f568e0e5c05babae10-eb2b664d-5343-4305-a9f0-08a2074fff0e"
-$dst = Join-Path $base "569c8b261a8a714d7731d5f568e0e5c05babae10"
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$basePattern = Join-Path $projectRoot "android\.gradle\*\dependencies-accessors"
 
-if (Test-Path $src) {
-    if (-not (Test-Path $dst)) {
-        New-Item -ItemType Directory -Path $dst -Force | Out-Null
+Get-ChildItem -Path $basePattern -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    $parent = $_.FullName
+    Get-ChildItem -Path $parent -Directory | Where-Object { $_.Name -match "^([0-9a-f]{40})-" } | ForEach-Object {
+        $hash = $matches[1]
+        $dst = Join-Path $parent $hash
+        if (-not (Test-Path $dst)) {
+            Write-Host "Robocopying immutable workspace: $hash" -ForegroundColor Cyan
+            & robocopy $_.FullName $dst /E /NFL /NDO /NJH /NJS | Out-Null
+        }
     }
-    Copy-Item -Path "$src\*" -Destination $dst -Recurse -Force
-    Write-Host "Successfully populated immutable workspace: $dst" -ForegroundColor Green
-    Get-ChildItem $dst
-} else {
-    Write-Host "Source not found!" -ForegroundColor Red
 }
+Write-Host "Workspace sync complete." -ForegroundColor Green

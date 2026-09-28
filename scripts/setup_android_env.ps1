@@ -1,6 +1,49 @@
 # Master Android & Java Environment Configuration Script for SM Controller
-$javaDir = "C:\Users\Khandaker Shanto\AppData\Local\Java\jdk-17"
-$androidSdkDir = "C:\Users\Khandaker Shanto\AppData\Local\Android\Sdk"
+$localAppData = [Environment]::GetFolderPath("LocalApplicationData")
+
+# Auto-detect Java (Prioritize JDK 17)
+$adoptiumPaths = Get-ChildItem -Path "C:\Program Files\Eclipse Adoptium" -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+
+$javaCandidates = @()
+if ($adoptiumPaths) {
+    $javaCandidates += $adoptiumPaths
+}
+$javaCandidates += @(
+    "$localAppData\Java\jdk-17",
+    "C:\Program Files\Java\jdk-17",
+    "C:\Program Files\Android\Android Studio\jbr"
+)
+
+$javaDir = $null
+foreach ($cand in $javaCandidates) {
+    if (Test-Path "$cand\bin\java.exe") {
+        $javaDir = $cand
+        break
+    }
+}
+
+# Auto-detect Android SDK
+$androidSdkCandidates = @(
+    "$localAppData\Android\Sdk",
+    "C:\Android\Sdk"
+)
+$androidSdkDir = $null
+foreach ($cand in $androidSdkCandidates) {
+    if (Test-Path "$cand\platform-tools\adb.exe") {
+        $androidSdkDir = $cand
+        break
+    }
+}
+
+if (-not $javaDir) {
+    Write-Error "Could not find a valid Java / JDK installation."
+    exit 1
+}
+if (-not $androidSdkDir) {
+    Write-Error "Could not find a valid Android SDK installation."
+    exit 1
+}
+
 $platformTools = "$androidSdkDir\platform-tools"
 $emulatorDir = "$androidSdkDir\emulator"
 $javaBin = "$javaDir\bin"
@@ -34,7 +77,8 @@ foreach ($p in $pathsToAdd) {
 $env:Path = "$javaBin;$platformTools;$emulatorDir;" + $env:Path
 
 Write-Output "=== 4. Updating android/local.properties ==="
-$localPropPath = "d:\Panel\My-app\sm-remote-controller\android\local.properties"
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$localPropPath = Join-Path $projectRoot "android\local.properties"
 $escapedSdk = $androidSdkDir.Replace("\", "\\").Replace(":", "\:")
 "sdk.dir=$escapedSdk" | Out-File -FilePath $localPropPath -Encoding ascii
 Write-Output "local.properties configured with sdk.dir: $escapedSdk"
@@ -43,7 +87,7 @@ Write-Output "=== 5. Verification ==="
 Write-Output "Java version:"
 & "$javaBin\java.exe" -version
 
-Write-Output "ADB version & connected devices:"
+Write-Output "`nADB version & connected devices:"
 & "$platformTools\adb.exe" devices
 
 Write-Output "`n>>> All Environment Variables configured successfully! <<<"
