@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using System.Reflection;
 
 namespace SmRemoteController
 {
@@ -142,6 +143,22 @@ namespace SmRemoteController
                     SetWindowLong(targetHwnd, GWL_STYLE, style);
 
                     SetWindowPos(targetHwnd, IntPtr.Zero, posX, posY, targetWidth, targetHeight, SWP_FRAMECHANGED | SWP_NOZORDER);
+
+                    // Set taskbar & title bar icon from exe's own icon
+                    try
+                    {
+                        string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                        Icon appIcon = Icon.ExtractAssociatedIcon(exePath);
+                        if (appIcon != null)
+                        {
+                            IntPtr hIconSmall = appIcon.Handle;
+                            IntPtr hIconBig = appIcon.Handle;
+                            SendMessage(targetHwnd, WM_SETICON, (IntPtr)ICON_SMALL, hIconSmall);
+                            SendMessage(targetHwnd, WM_SETICON, (IntPtr)ICON_BIG, hIconBig);
+                        }
+                    }
+                    catch { }
+
                     break;
                 }
             }
