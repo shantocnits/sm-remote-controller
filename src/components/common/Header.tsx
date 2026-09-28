@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Shadows } from '../../theme/shadows';
@@ -9,10 +9,15 @@ import { UpdateModal } from './UpdateModal';
 import { checkForAppUpdates } from '../../services/updateService';
 
 export const Header: React.FC = () => {
-  const { toggleModeDropdown, isModeDropdownOpen } = useAppStore();
+  const { toggleModeDropdown, isModeDropdownOpen, appVersion } = useAppStore();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Pulse animation for header badge
   const glowAnim = useRef(new Animated.Value(0.4)).current;
+  // Rotation animation for update button
+  const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -32,14 +37,35 @@ export const Header: React.FC = () => {
     pulse.start();
 
     // Check updates on startup
-    checkForAppUpdates().then((info) => {
+    checkForAppUpdates(appVersion).then((info) => {
       if (info.hasUpdate) {
         setHasNewUpdate(true);
       }
     });
 
     return () => pulse.stop();
-  }, [glowAnim]);
+  }, [glowAnim, appVersion]);
+
+  const handleOpenUpdate = () => {
+    // Start continuous spin animation
+    setIsScanning(true);
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, {
+      toValue: 1,
+      duration: 800,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsScanning(false);
+    });
+
+    setIsUpdateModalOpen(true);
+  };
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   return (
     <View style={styles.container}>
@@ -50,16 +76,18 @@ export const Header: React.FC = () => {
         <Text style={[Typography.caption, styles.developerText]}>
           dev: Khandaker shanto
         </Text>
-        <Text style={[Typography.micro, styles.versionText]}>Version 1.0.0</Text>
+        <Text style={[Typography.micro, styles.versionText]}>Version {appVersion}</Text>
       </View>
 
       <View style={styles.buttonsRow}>
-        {/* Update Button (Left of Menu) */}
+        {/* Update Button (Left of Menu) with animated spin */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setIsUpdateModalOpen(true)}
+          onPress={handleOpenUpdate}
           style={[styles.updateButton, Shadows.subtleNeon]}>
-          <VectorIcon name="update" size={18} color={Colors.brandGreen} />
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <VectorIcon name="update" size={18} color={Colors.brandGreen} />
+          </Animated.View>
           {hasNewUpdate && <View style={styles.updateBadge} />}
         </TouchableOpacity>
 
@@ -113,6 +141,8 @@ const styles = StyleSheet.create({
   versionText: {
     color: Colors.textGray,
     marginTop: 2,
+    fontFamily: 'monospace',
+    fontSize: 11,
   },
   buttonsRow: {
     flexDirection: 'row',

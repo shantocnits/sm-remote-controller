@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,15 @@ import {
   ToastAndroid,
   Platform,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { VectorIcon } from './VectorIcon';
-import { checkForAppUpdates, UpdateInfo, CURRENT_VERSION } from '../../services/updateService';
+import { checkForAppUpdates, UpdateInfo } from '../../services/updateService';
 import { Shadows } from '../../theme/shadows';
+import { useAppStore } from '../../store/useAppStore';
 
 interface UpdateModalProps {
   visible: boolean;
@@ -26,41 +29,68 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   visible,
   onClose,
 }) => {
+  const { appVersion, setAppVersion } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isUpdated, setIsUpdated] = useState(false);
+
+  // Spin animation for the modal checking icon
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({
     hasUpdate: false,
-    currentVersion: CURRENT_VERSION,
-    latestVersion: CURRENT_VERSION,
+    currentVersion: appVersion,
+    latestVersion: appVersion,
     releaseDate: '28 Sept 2026',
     changelog: [
-      '🔥 New: Custom Remote Controller App Icon & Brand Logo',
-      '🚀 New: In-App GitHub Auto-Update System with changelog viewer',
-      '✨ New: Interactive File Manager, Call Logs, App Manager & System Shell',
-      '💬 New: Voice Player, Photo & Document Attachment in Live Chat',
-      '📹 New: Fullscreen Video Call with Draggable Self-Camera & PiP Multitasking',
-      '⚡ Fix: 2-Column Full Width Grid & Status Bar Inset Overlaps',
+      '🔥 Custom Remote Controller App Icon & Brand Logo',
+      '🚀 In-App GitHub Auto-Update System with changelog viewer',
+      '✨ Interactive File Manager, Call Logs, App Manager & System Shell',
+      '💬 Voice Player, Photo & Document Attachment in Live Chat',
+      '📹 Fullscreen Video Call with Draggable Self-Camera & PiP Multitasking',
+      '⚡ Strict Network Monitoring & Fast Offline Screen Protection',
     ],
   });
 
+  const startSpinAnimation = () => {
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, {
+      toValue: 1,
+      duration: 1000,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const check = async () => {
     setLoading(true);
-    const res = await checkForAppUpdates();
-    setUpdateInfo(res);
-    setLoading(false);
+    startSpinAnimation();
+    try {
+      const res = await checkForAppUpdates(appVersion);
+      setUpdateInfo(res);
+      setIsUpdated(false);
+    } catch (e) {
+      // ignore
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+      }, 600);
+    }
   };
 
   useEffect(() => {
     if (visible) {
       check();
     }
-  }, [visible]);
+  }, [visible, appVersion]);
 
+  // Simulate or download and apply OTA update
   const handleDownloadUpdate = () => {
     setIsDownloading(true);
     setDownloadProgress(0);
+
+    const targetVersion = updateInfo.latestVersion || '1.1.0';
 
     const interval = setInterval(() => {
       setDownloadProgress((prev) => {
@@ -69,20 +99,54 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           setIsDownloading(false);
           setIsUpdated(true);
 
-          const msg = 'New update package downloaded & applied!';
+          // Update global app version in store
+          setAppVersion(targetVersion);
+
+          setUpdateInfo((curr) => ({
+            ...curr,
+            hasUpdate: false,
+            currentVersion: targetVersion,
+            latestVersion: targetVersion,
+          }));
+
+          const msg = `🎉 Update v${targetVersion} applied successfully!`;
           if (Platform.OS === 'android') {
             ToastAndroid.show(msg, ToastAndroid.LONG);
           } else {
-            Alert.alert('Update Applied', msg);
+            Alert.alert('Update Complete', msg);
           }
           return 100;
         }
-        return prev + 20;
+        return prev + 25;
       });
-    }, 350);
+    }, 300);
   };
 
-  const isUpToDate = !updateInfo.hasUpdate || isUpdated;
+  // Helper to simulate a new version available for testing
+  const handleSimulateNewVersion = () => {
+    const nextVer = '1.1.0';
+    setUpdateInfo({
+      hasUpdate: true,
+      currentVersion: appVersion,
+      latestVersion: nextVer,
+      releaseDate: '28 Sept 2026',
+      changelog: [
+        '🚀 New: Live Screen Recording with automatic MP4 export',
+        '📸 New: Camera Shutter Flash & instant Screenshot preview',
+        '🎙️ New: Real-time Mic Mute / Unmute voice toggle',
+        '⌨️ New: Remote Virtual Keyboard & PC Shortcut Key tray',
+        '⚡ Performance improvements & ultra-low latency stream',
+      ],
+    });
+    setIsUpdated(false);
+  };
+
+  const isUpToDate = (!updateInfo.hasUpdate || isUpdated) && !loading;
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -92,16 +156,26 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={[styles.iconCircle, isUpToDate && styles.iconCircleGreen]}>
-                <VectorIcon
-                  name={isUpToDate ? 'check' : 'download'}
-                  size={20}
-                  color={isUpToDate ? '#000000' : Colors.brandGreen}
-                />
+                {loading ? (
+                  <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                    <VectorIcon name="update" size={20} color={Colors.brandGreen} />
+                  </Animated.View>
+                ) : (
+                  <VectorIcon
+                    name={isUpToDate ? 'check' : 'download'}
+                    size={20}
+                    color={isUpToDate ? '#000000' : Colors.brandGreen}
+                  />
+                )}
               </View>
               <View>
                 <Text style={[Typography.titleMedium, styles.title]}>App Updates</Text>
                 <Text style={styles.versionStatus}>
-                  {isUpToDate ? '✓ You are on latest version' : '🔥 New Update Available!'}
+                  {loading
+                    ? 'Scanning GitHub for updates...'
+                    : isUpToDate
+                    ? '✓ You are on latest version'
+                    : '🔥 New Update Available!'}
                 </Text>
               </View>
             </View>
@@ -131,8 +205,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           {/* Changelog Title */}
           <View style={styles.changelogHeader}>
             <Text style={styles.changelogTitle}>What's New in this Release:</Text>
-            <TouchableOpacity onPress={check} disabled={loading}>
-              <Text style={styles.refreshText}>{loading ? 'Checking...' : 'Check Again ↻'}</Text>
+            <TouchableOpacity
+              onPress={check}
+              disabled={loading}
+              style={styles.refreshBtn}>
+              <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                <VectorIcon name="update" size={12} color={Colors.brandGreen} />
+              </Animated.View>
+              <Text style={styles.refreshText}>
+                {loading ? 'Checking...' : 'Check Again'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -159,23 +241,38 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             </View>
           )}
 
-          {/* Action Button: Only Update Button if update available, otherwise Up To Date badge */}
+          {/* Action Button: Only Update Button if update available, otherwise Up To Date banner */}
           {!isUpToDate ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleDownloadUpdate}
-              disabled={isDownloading}
+              disabled={isDownloading || loading}
               style={styles.updateBtn}>
               <VectorIcon name="download" size={16} color="#000000" />
               <Text style={styles.updateBtnText}>
-                {isDownloading ? 'Downloading...' : 'Update Now'}
+                {isDownloading
+                  ? 'Downloading & Applying...'
+                  : `Update Now (v${updateInfo.latestVersion})`}
               </Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.upToDateBanner}>
               <VectorIcon name="check" size={16} color={Colors.brandGreen} />
-              <Text style={styles.upToDateText}>You are on the latest version (v{updateInfo.latestVersion})</Text>
+              <Text style={styles.upToDateText}>
+                You are on the latest version (v{updateInfo.currentVersion})
+              </Text>
             </View>
+          )}
+
+          {/* Interactive Simulation Helper for User Testing */}
+          {isUpToDate && (
+            <TouchableOpacity
+              onPress={handleSimulateNewVersion}
+              style={styles.simulateRow}>
+              <Text style={styles.simulateText}>
+                🧪 Test OTA: Simulate v1.1.0 update available
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -199,7 +296,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(45, 212, 191, 0.35)',
     padding: 20,
-    maxHeight: '85%',
+    maxHeight: '88%',
   },
   header: {
     flexDirection: 'row',
@@ -285,13 +382,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   refreshText: {
     color: Colors.brandGreen,
     fontSize: 11,
     fontWeight: '600',
   },
   changelogList: {
-    maxHeight: 200,
+    maxHeight: 190,
     backgroundColor: Colors.appBg,
     borderRadius: 14,
     padding: 12,
@@ -374,5 +476,15 @@ const styles = StyleSheet.create({
     color: Colors.brandGreen,
     fontSize: 13,
     fontWeight: '700',
+  },
+  simulateRow: {
+    marginTop: 10,
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  simulateText: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    textDecorationLine: 'underline',
   },
 });

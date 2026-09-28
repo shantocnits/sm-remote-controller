@@ -25,6 +25,10 @@ interface AppStoreState {
   isVoiceRecording: boolean;
   voiceSeconds: number;
 
+  // App Version & Updates
+  appVersion: string;
+  setAppVersion: (ver: string) => void;
+
   // Actions
   setMode: (mode: AppMode) => void;
   setActiveTab: (tab: ActiveTab) => void;
@@ -135,7 +139,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   toggleModeDropdown: () =>
     set((state) => ({ isModeDropdownOpen: !state.isModeDropdownOpen })),
 
-  closeModeDropdown: () => set({ isModeDropdownOpen: false }),
+  // App Version
+  appVersion: '1.0.0',
+  setAppVersion: (ver: string) => set({ appVersion: ver }),
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
 
