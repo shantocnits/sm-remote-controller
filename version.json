@@ -1,18 +1,17 @@
 {
-  "version": "1.2.0",
-  "versionCode": 3,
-  "releaseDate": "2026-09-28",
+  "version": "1.3.0",
+  "versionCode": 4,
+  "releaseDate": "2026-09-29",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.2.0/SM_Remote_Controller.apk",
-  "exeUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.2.0/SM_Remote_Controller.exe",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.3.0/SM_Remote_Controller.apk",
+  "exeUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.3.0/SM_Remote_Controller.exe",
   "changelog": [
+    "⚡ New: Multi-CDN Mirror Fallback (raw GitHub, jsDelivr CDN & GitHub API)",
+    "🛡️ New: Transparent connection & repo visibility status in Update Modal",
     "🚀 New: Live Screen Recording with automatic MP4 export",
     "📸 New: Camera Screenshot with flash animation",
     "🎙️ New: Real-time Mic Mute / Unmute voice toggle",
     "⌨️ New: Remote Virtual Keyboard & PC Shortcut Key tray",
-    "🛡️ Fix: Strict Network Monitoring & fast offline block",
-    "⚡ Fix: OTA Update detection & version comparison improved",
-    "🖥️ Fix: Desktop taskbar icon now shows correctly"
+    "🖥️ Fix: Unified seamless update download for both Mobile & Desktop"
   ]
 }
-
