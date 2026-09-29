@@ -10,6 +10,7 @@ interface AppStoreState {
 
   // Devices
   devices: Device[];
+  connectedDevice: Device | null;
 
   // Video Call State
   videoCallStatus: VideoCallStatus;
@@ -37,6 +38,9 @@ interface AppStoreState {
   setPartnerIdInput: (val: string) => void;
 
   // Device Actions
+  addDevice: (code: string, customName?: string, type?: 'mobile' | 'desktop') => Device;
+  connectToPartner: (code: string) => Device;
+  setConnectedDevice: (device: Device | null) => void;
   togglePinDevice: (id: string) => void;
   setDeviceNickname: (id: string, nickname: string) => void;
   removeDevice: (id: string) => void;
@@ -109,6 +113,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   // Devices
   devices: initialDevices,
+  connectedDevice: initialDevices[0],
 
   // Calls
   videoCallStatus: 'idle',
@@ -144,6 +149,59 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   setAppVersion: (ver: string) => set({ appVersion: ver }),
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
+
+  setConnectedDevice: (device: Device | null) => set({ connectedDevice: device }),
+
+  addDevice: (code: string, customName?: string, type?: 'mobile' | 'desktop') => {
+    const cleanDigits = code.replace(/[^0-9]/g, '');
+    const formattedCode =
+      cleanDigits.length === 6
+        ? `${cleanDigits.slice(0, 3)} ${cleanDigits.slice(3)}`
+        : code.trim();
+
+    const currentDevices = get().devices;
+    const existing = currentDevices.find(
+      (d) => d.code.replace(/\s+/g, '') === cleanDigits
+    );
+
+    if (existing) {
+      const reordered = [
+        existing,
+        ...currentDevices.filter((d) => d.id !== existing.id),
+      ];
+      set({ devices: reordered, connectedDevice: existing });
+      return existing;
+    }
+
+    const currentMode = get().currentMode;
+    const resolvedType: 'mobile' | 'desktop' =
+      type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
+
+    const defaultName =
+      resolvedType === 'desktop'
+        ? `Desktop PC (${formattedCode})`
+        : `Galaxy Phone (${formattedCode})`;
+
+    const newDevice: Device = {
+      id: `dev-${Date.now()}`,
+      name: customName || defaultName,
+      code: formattedCode,
+      type: resolvedType,
+      isPinned: false,
+    };
+
+    set({
+      devices: [newDevice, ...currentDevices],
+      connectedDevice: newDevice,
+    });
+    return newDevice;
+  },
+
+  connectToPartner: (code: string) => {
+    const target = get().addDevice(code);
+    set({ activeTab: 'remote' });
+    return target;
+  },
 
   // Device actions
   togglePinDevice: (id: string) => {

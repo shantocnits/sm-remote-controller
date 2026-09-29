@@ -166,7 +166,7 @@
     </style>
 </head>
 
-<body class="bg-[#090a0c] w-full h-screen text-white font-sans overflow-hidden select-none m-0 p-0" onload="startClock(); checkOnlineStatus(); autoCheckUpdatesOnStart();">
+<body class="bg-[#090a0c] w-full h-screen text-white font-sans overflow-hidden select-none m-0 p-0" onload="startClock(); checkOnlineStatus(); autoCheckUpdatesOnStart(); loadRecentDevices();">
 
     <div id="app-container"
         class="w-full h-full bg-appBg relative overflow-hidden flex flex-col bg-gradient-radial">
@@ -417,9 +417,10 @@
                         <div class="flex-1 bg-appBg rounded-2xl border border-gray-700 flex items-center px-4">
                             <i class="fa-solid fa-keyboard text-textGray mr-2 text-sm"></i>
                             <input id="partner-id-input" type="text" placeholder="Partner ID"
+                                onkeydown="if(event.key==='Enter') connectPartner()"
                                 class="w-full bg-transparent border-none outline-none text-white font-mono py-2.5 text-sm">
                         </div>
-                        <button onclick="switchTab('remote')"
+                        <button onclick="connectPartner()"
                             class="w-12 h-12 rounded-2xl bg-brandGreen text-black flex items-center justify-center text-lg hover:scale-105 transition-transform shadow-lg shadow-brandGreen/20">
                             <i class="fa-solid fa-arrow-right"></i>
                         </button>
@@ -434,31 +435,7 @@
                     </div>
 
                     <div id="recent-devices-list" class="space-y-2.5">
-                        <div id="device-1" class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-brandGreen border border-gray-700">
-                                    <i class="fa-solid fa-mobile-screen"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold text-white text-sm">Galaxy S23 Ultra</h4>
-                                    <p class="text-xs text-textGray font-mono">ID: 412 887</p>
-                                </div>
-                            </div>
-                            <button onclick="switchTab('remote')" class="text-brandGreen text-xs bg-appBg px-3 py-1.5 rounded-xl border border-brandGreen/30">Connect</button>
-                        </div>
-
-                        <div id="device-2" class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition">
-                            <div class="flex items-center gap-3.5">
-                                <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center text-gray-400 border border-gray-700">
-                                    <i class="fa-solid fa-desktop"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold text-white text-sm">Shanto's PC</h4>
-                                    <p class="text-xs text-textGray font-mono">ID: 882 109</p>
-                                </div>
-                            </div>
-                            <button onclick="switchTab('remote')" class="text-brandGreen text-xs bg-appBg px-3 py-1.5 rounded-xl border border-brandGreen/30">Connect</button>
-                        </div>
+                        <!-- Dynamically populated by renderRecentDevices() -->
                     </div>
                 </div>
             </div>
@@ -467,32 +444,127 @@
             <div id="view-remote" class="view-section flex-col h-full -mx-5 -mt-8">
                 <div class="relative w-full h-full bg-black flex flex-col min-h-[500px]">
                     <!-- Top Status Bar -->
-                    <div class="absolute top-0 w-full px-5 py-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
-                        <div class="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-gray-700">
-                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                            <span class="text-xs font-semibold">Live Session</span>
+                    <div class="absolute top-0 w-full px-4 py-3 flex justify-between items-center z-20 bg-gradient-to-b from-black/90 via-black/50 to-transparent">
+                        <div class="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-gray-700">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                            <i id="connected-partner-icon" class="fa-solid fa-desktop text-brandGreen text-xs"></i>
+                            <div>
+                                <span id="connected-partner-name" class="text-xs font-bold text-white block leading-tight">Shanto's PC</span>
+                                <span id="connected-partner-id" class="text-[10px] text-brandGreen font-mono font-semibold block leading-tight">ID: 948 201</span>
+                            </div>
                         </div>
 
                         <div class="flex items-center gap-2">
-                            <div id="rec-status-pill" style="display: none;" class="hidden items-center gap-1.5 bg-red-500/20 border border-red-500 px-2.5 py-0.5 rounded-full text-[11px] text-red-500 font-bold font-mono">
+                            <!-- Share Screen Button for Windows Desktop -->
+                            <button onclick="toggleShareDesktopScreen()" id="btn-share-screen"
+                                class="bg-brandGreen text-black text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:scale-105 transition shadow-lg shadow-brandGreen/20">
+                                <i class="fa-solid fa-display text-xs"></i>
+                                <span id="share-screen-btn-text">Share Screen</span>
+                            </button>
+
+                            <div class="hidden sm:flex bg-brandGreen/20 text-brandGreen border border-brandGreen/40 text-[10px] px-2.5 py-1 rounded-full font-mono font-bold">
+                                60 FPS • 1080p
+                            </div>
+
+                            <div id="rec-status-pill" style="display: none;" class="hidden items-center gap-1.5 bg-red-500/20 border border-red-500 px-2.5 py-1 rounded-full text-[11px] text-red-500 font-bold font-mono">
                                 <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                                 <span id="rec-timer-text">REC 00:00</span>
                             </div>
 
-                            <div id="mic-status-pill" style="display: none;" class="hidden items-center gap-1 bg-red-500/20 border border-red-500/50 px-2 py-0.5 rounded-full text-[10px] text-red-500 font-bold">
+                            <div id="mic-status-pill" style="display: none;" class="hidden items-center gap-1 bg-red-500/20 border border-red-500/50 px-2 py-1 rounded-full text-[10px] text-red-500 font-bold">
                                 <i class="fa-solid fa-microphone-slash"></i> MUTED
                             </div>
 
-                            <span id="remote-session-timer" class="text-xs font-mono text-gray-300 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">04:22</span>
+                            <span id="remote-session-timer" class="text-xs font-mono text-gray-300 bg-black/60 px-3 py-1 rounded-full backdrop-blur-md border border-gray-800">00:01</span>
                         </div>
                     </div>
 
-                    <!-- Stream Image -->
-                    <img src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop"
-                        class="w-full h-full object-cover opacity-70">
+                    <!-- Live Real-Time WebRTC Video Stream -->
+                    <video id="desktop-remote-video" autoplay playsinline class="hidden w-full h-full object-contain bg-black z-10"></video>
+
+                    <!-- Interactive OS Remote Canvas -->
+                    <div id="remote-interactive-stage"
+                        onmousemove="handleDesktopMouseMove(event)"
+                        onclick="handleDesktopStageClick(event)"
+                        class="w-full h-full relative overflow-hidden flex flex-col items-center justify-center bg-[#07090e] select-none">
+                        
+                        <!-- Desktop Viewport -->
+                        <div id="stage-desktop-os" class="w-full h-full relative flex flex-col justify-between p-4">
+                            <!-- Desktop Icons Column -->
+                            <div class="absolute left-6 top-16 flex flex-col gap-4 z-10">
+                                <div class="flex flex-col items-center w-14 group cursor-pointer">
+                                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-105 transition">
+                                        <i class="fa-solid fa-desktop text-lg"></i>
+                                    </div>
+                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">This PC</span>
+                                </div>
+                                <div class="flex flex-col items-center w-14 group cursor-pointer">
+                                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition">
+                                        <i class="fa-solid fa-folder text-lg"></i>
+                                    </div>
+                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">Files</span>
+                                </div>
+                                <div class="flex flex-col items-center w-14 group cursor-pointer">
+                                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition">
+                                        <i class="fa-solid fa-terminal text-lg"></i>
+                                    </div>
+                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">Terminal</span>
+                                </div>
+                                <div class="flex flex-col items-center w-14 group cursor-pointer">
+                                    <div class="w-10 h-10 rounded-xl bg-brandGreen/20 border border-brandGreen/30 flex items-center justify-center text-brandGreen group-hover:scale-105 transition">
+                                        <i class="fa-solid fa-satellite-dish text-lg"></i>
+                                    </div>
+                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">SM Controller</span>
+                                </div>
+                            </div>
+
+                            <!-- Floating Active PowerShell Window -->
+                            <div class="self-center mt-12 w-[85%] max-w-lg bg-[#0f172a]/95 rounded-2xl border border-brandGreen/40 shadow-2xl overflow-hidden z-10">
+                                <div class="bg-[#0b1120] px-4 py-2 flex items-center justify-between border-b border-gray-800">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                                    </div>
+                                    <span id="window-terminal-title" class="text-[11px] font-mono text-gray-400">Windows PowerShell — SM Remote Protocol v1.3.0</span>
+                                    <div class="w-8"></div>
+                                </div>
+                                <div id="remote-terminal-logs" class="p-4 font-mono text-xs text-sky-400 space-y-1 bg-[#030712] min-h-[140px]">
+                                    <p class="text-brandGreen">&gt; P2P Direct WebRTC Stream Active</p>
+                                    <p id="term-partner-info">&gt; Connected Peer: Shanto's PC (ID: 948 201)</p>
+                                    <p>&gt; Stream: 1920x1080 @ 60 FPS | Ultra-Low Latency</p>
+                                    <p class="text-white">&gt; Type text via Remote Keyboard to interact with remote host</p>
+                                </div>
+                                <div class="bg-[#030712] px-4 pb-3 flex items-center font-mono text-xs text-emerald-400">
+                                    <span>PS C:\Windows\System32&gt;&nbsp;</span>
+                                    <span id="term-live-preview" class="text-white"></span>
+                                    <span class="w-2 h-4 bg-brandGreen animate-pulse ml-1 inline-block"></span>
+                                </div>
+                            </div>
+
+                            <!-- Virtual Mouse Pointer -->
+                            <div id="desktop-virtual-cursor" class="absolute pointer-events-none z-30 transition-all duration-75 text-brandGreen flex items-start" style="left: 240px; top: 180px;">
+                                <i class="fa-solid fa-arrow-pointer text-xl drop-shadow-[0_0_8px_rgba(45,212,191,0.8)]"></i>
+                                <span id="cursor-pos-badge" class="bg-black/90 text-brandGreen border border-brandGreen/40 text-[9px] font-mono px-1.5 py-0.5 rounded ml-1 hidden">240, 180</span>
+                            </div>
+
+                            <!-- Windows 11 Taskbar -->
+                            <div class="w-full bg-[#0f172a]/95 border-t border-gray-800 h-11 rounded-t-xl flex items-center justify-between px-4 z-20 mt-auto">
+                                <div class="flex items-center gap-3 mx-auto">
+                                    <button class="w-8 h-8 rounded-lg bg-brandGreen/20 text-brandGreen flex items-center justify-center border-b-2 border-brandGreen"><i class="fa-solid fa-desktop text-xs"></i></button>
+                                    <button class="w-8 h-8 rounded-lg bg-gray-800 text-amber-400 flex items-center justify-center"><i class="fa-solid fa-folder text-xs"></i></button>
+                                    <button class="w-8 h-8 rounded-lg bg-gray-800 text-sky-400 flex items-center justify-center"><i class="fa-solid fa-terminal text-xs"></i></button>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-gray-400 font-mono">
+                                    <i class="fa-solid fa-wifi text-[11px]"></i>
+                                    <span id="taskbar-live-clock">12:51 PM</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Floating Action Toolbar -->
-                    <div class="absolute bottom-28 left-1/2 -translate-x-1/2 bg-cardBg/90 backdrop-blur-xl border border-gray-700 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl z-20">
+                    <div class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-cardBg/90 backdrop-blur-xl border border-gray-700 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl z-30">
                         <!-- 1. Keyboard Button -->
                         <button onclick="openRemoteKeyboard()" id="btn-remote-keyboard"
                             class="w-10 h-10 rounded-xl bg-appBg/50 text-gray-300 hover:text-brandGreen transition flex items-center justify-center">
@@ -520,7 +592,7 @@
                         <div class="w-[1px] h-6 bg-gray-700 mx-1"></div>
 
                         <!-- Disconnect Button -->
-                        <button onclick="switchTab('home')"
+                        <button onclick="disconnectSession()"
                             class="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition flex items-center justify-center">
                             <i class="fa-solid fa-phone-slash"></i>
                         </button>
@@ -858,11 +930,28 @@
             const val = input.value.trim();
             if (!val) return;
             showToast(`⌨️ Typed: "${val}" sent to remote!`);
+            
+            const termLogs = document.getElementById('remote-terminal-logs');
+            if (termLogs) {
+                const p = document.createElement('p');
+                p.className = 'text-white font-mono';
+                p.innerText = `> ${val}`;
+                termLogs.appendChild(p);
+                termLogs.scrollTop = termLogs.scrollHeight;
+            }
             input.value = '';
         }
 
         function sendShortcutKey(keyName) {
             showToast(`⌨️ Key [${keyName}] sent to remote!`);
+            const termLogs = document.getElementById('remote-terminal-logs');
+            if (termLogs) {
+                const p = document.createElement('p');
+                p.className = 'text-amber-400 font-mono';
+                p.innerText = `> Key [${keyName}] executed on remote host`;
+                termLogs.appendChild(p);
+                termLogs.scrollTop = termLogs.scrollHeight;
+            }
         }
 
         // --- 5. IN-APP OTA GITHUB UPDATE SCANNER ---
@@ -1143,10 +1232,218 @@
             });
         }
 
-        function clearRecentDevices() {
-            if (confirm('Clear recent devices list?')) {
-                document.getElementById('recent-devices-list').innerHTML = '<p class="text-xs text-gray-500 py-2">No recent devices.</p>';
+        // --- RECENT DEVICES & REAL-TIME SCREEN STREAMING ENGINE ---
+        let recentDevices = [];
+
+        function loadRecentDevices() {
+            try {
+                const stored = localStorage.getItem('sm_recent_devices');
+                if (stored) {
+                    recentDevices = JSON.parse(stored);
+                } else {
+                    recentDevices = [
+                        { id: '1', name: 'Galaxy S23 Ultra', code: '412 887', type: 'mobile' },
+                        { id: '2', name: "Shanto's PC", code: '882 109', type: 'desktop' }
+                    ];
+                    saveRecentDevices();
+                }
+            } catch (e) {
+                recentDevices = [
+                    { id: '1', name: 'Galaxy S23 Ultra', code: '412 887', type: 'mobile' },
+                    { id: '2', name: "Shanto's PC", code: '882 109', type: 'desktop' }
+                ];
             }
+            renderRecentDevices();
+        }
+
+        function saveRecentDevices() {
+            try {
+                localStorage.setItem('sm_recent_devices', JSON.stringify(recentDevices));
+            } catch (e) {}
+        }
+
+        function renderRecentDevices() {
+            const container = document.getElementById('recent-devices-list');
+            if (!container) return;
+            if (!recentDevices || recentDevices.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-500 py-3 text-center">No recent devices.</p>';
+                return;
+            }
+            container.innerHTML = recentDevices.map(dev => `
+                <div class="bg-cardBg rounded-2xl p-3.5 flex items-center justify-between subtle-neon-border relative transition hover:border-brandGreen/40">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-appBg flex items-center justify-center ${dev.type === 'mobile' ? 'text-brandGreen' : 'text-blue-400'} border border-gray-700">
+                            <i class="fa-solid ${dev.type === 'mobile' ? 'fa-mobile-screen' : 'fa-desktop'}"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-white text-sm">${dev.name}</h4>
+                            <p class="text-xs text-textGray font-mono">ID: ${dev.code}</p>
+                        </div>
+                    </div>
+                    <button onclick="startRemoteSession('${dev.code}', '${dev.name}', '${dev.type}')" class="text-brandGreen text-xs bg-appBg px-3.5 py-1.5 rounded-xl border border-brandGreen/40 hover:bg-brandGreen hover:text-black font-semibold transition">Connect</button>
+                </div>
+            `).join('');
+        }
+
+        function addRecentDevice(code, name, type) {
+            const cleanCode = code.replace(/[^0-9]/g, '');
+            const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : code;
+            const existingIndex = recentDevices.findIndex(d => d.code.replace(/\s+/g, '') === cleanCode);
+            const modeLabel = document.getElementById('current-mode-label');
+            const isDesktopMode = modeLabel && modeLabel.innerText.includes('Desktop');
+            const resolvedType = type || (isDesktopMode ? 'desktop' : 'mobile');
+            const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
+
+            if (existingIndex !== -1) {
+                const [item] = recentDevices.splice(existingIndex, 1);
+                item.name = name || item.name;
+                recentDevices.unshift(item);
+            } else {
+                recentDevices.unshift({
+                    id: 'dev-' + Date.now(),
+                    name: resolvedName,
+                    code: formatted,
+                    type: resolvedType
+                });
+            }
+            saveRecentDevices();
+            renderRecentDevices();
+        }
+
+        function clearRecentDevices() {
+            if (confirm('Clear all recent devices?')) {
+                recentDevices = [];
+                saveRecentDevices();
+                renderRecentDevices();
+                showToast('Recent devices cleared.');
+            }
+        }
+
+        function connectPartner() {
+            const input = document.getElementById('partner-id-input');
+            const raw = input.value.trim().replace(/[^0-9]/g, '');
+            if (!raw || raw.length < 3) {
+                showToast('⚠️ Please enter a valid 6-digit Partner ID');
+                return;
+            }
+            const formatted = raw.length === 6 ? `${raw.slice(0, 3)} ${raw.slice(3)}` : raw;
+            addRecentDevice(formatted);
+            startRemoteSession(formatted);
+        }
+
+        let currentSessionStream = null;
+
+        function startRemoteSession(code, name, type) {
+            const cleanCode = (code || '').replace(/[^0-9]/g, '');
+            const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : (code || '948 201');
+            const modeLabel = document.getElementById('current-mode-label');
+            const isDesktopMode = modeLabel && modeLabel.innerText.includes('Desktop');
+            const resolvedType = type || (isDesktopMode ? 'desktop' : 'mobile');
+            const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
+
+            const nameElem = document.getElementById('connected-partner-name');
+            if (nameElem) nameElem.innerText = resolvedName;
+            const idElem = document.getElementById('connected-partner-id');
+            if (idElem) idElem.innerText = 'ID: ' + formatted;
+
+            const icon = document.getElementById('connected-partner-icon');
+            if (icon) {
+                icon.className = `fa-solid ${resolvedType === 'desktop' ? 'fa-desktop' : 'fa-mobile-screen'} text-brandGreen text-xs`;
+            }
+
+            const termInfo = document.getElementById('term-partner-info');
+            if (termInfo) {
+                termInfo.innerText = `> Connected Peer: ${resolvedName} (ID: ${formatted})`;
+            }
+
+            switchTab('remote');
+            showToast(`🟢 Connected to ${resolvedName}! Session active.`);
+        }
+
+        function disconnectSession() {
+            if (currentSessionStream) {
+                currentSessionStream.getTracks().forEach(t => t.stop());
+                currentSessionStream = null;
+            }
+            const video = document.getElementById('desktop-remote-video');
+            if (video) {
+                video.srcObject = null;
+                video.classList.add('hidden');
+            }
+            const shareBtn = document.getElementById('share-screen-btn-text');
+            if (shareBtn) shareBtn.innerText = 'Share Screen';
+            switchTab('home');
+            showToast('Session ended.');
+        }
+
+        async function toggleShareDesktopScreen() {
+            const video = document.getElementById('desktop-remote-video');
+            const btnText = document.getElementById('share-screen-btn-text');
+
+            if (currentSessionStream) {
+                currentSessionStream.getTracks().forEach(t => t.stop());
+                currentSessionStream = null;
+                if (video) {
+                    video.srcObject = null;
+                    video.classList.add('hidden');
+                }
+                if (btnText) btnText.innerText = 'Share Screen';
+                showToast('Screen sharing stopped.');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: 'always', frameRate: 60 },
+                    audio: true
+                });
+                currentSessionStream = stream;
+                if (video) {
+                    video.srcObject = stream;
+                    video.classList.remove('hidden');
+                }
+                if (btnText) btnText.innerText = 'Stop Sharing';
+                showToast('🖥️ Screen broadcast active! Streaming at 60 FPS.');
+
+                stream.getVideoTracks()[0].onended = () => {
+                    currentSessionStream = null;
+                    if (video) {
+                        video.srcObject = null;
+                        video.classList.add('hidden');
+                    }
+                    if (btnText) btnText.innerText = 'Share Screen';
+                    showToast('Screen broadcast ended.');
+                };
+            } catch (err) {
+                if (err.name !== 'NotAllowedError') {
+                    showToast('Screen capture: ' + (err.message || 'Cancelled'));
+                }
+            }
+        }
+
+        function handleDesktopMouseMove(e) {
+            const cursor = document.getElementById('desktop-virtual-cursor');
+            const badge = document.getElementById('cursor-pos-badge');
+            const stage = document.getElementById('remote-interactive-stage');
+            if (!cursor || !stage) return;
+            const rect = stage.getBoundingClientRect();
+            const x = Math.round(e.clientX - rect.left);
+            const y = Math.round(e.clientY - rect.top);
+            cursor.style.left = (x - 4) + 'px';
+            cursor.style.top = (y - 4) + 'px';
+            if (badge) {
+                badge.innerText = `${x}, ${y}`;
+                badge.classList.remove('hidden');
+            }
+        }
+
+        function handleDesktopStageClick(e) {
+            const stage = document.getElementById('remote-interactive-stage');
+            if (!stage) return;
+            const rect = stage.getBoundingClientRect();
+            const x = Math.round(e.clientX - rect.left);
+            const y = Math.round(e.clientY - rect.top);
+            showToast(`🖱️ Remote Click at (${x}, ${y})`);
         }
 
         function sendChatMessage() {

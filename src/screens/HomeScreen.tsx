@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,11 @@ import { Device } from '../types';
 
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { devices, clearDevices, setActiveTab } = useAppStore();
+  const devices = useAppStore((state) => state.devices);
+  const clearDevices = useAppStore((state) => state.clearDevices);
+  const setActiveTab = useAppStore((state) => state.setActiveTab);
+  const setConnectedDevice = useAppStore((state) => state.setConnectedDevice);
+
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
@@ -31,6 +35,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleConnect = (device: Device) => {
+    setConnectedDevice(device);
     setActiveTab('remote');
   };
 
@@ -45,22 +50,27 @@ export const HomeScreen: React.FC = () => {
     );
   };
 
-  const renderHeader = () => (
-    <View style={styles.topSection}>
-      <DeviceIdCard />
-      <RemoteConnectCard />
+  const hasDevices = devices.length > 0;
 
-      <View style={styles.recentSectionHeader}>
-        <Text style={[Typography.titleMedium, styles.recentTitle]}>
-          Recent Devices
-        </Text>
-        {devices.length > 0 && (
-          <TouchableOpacity activeOpacity={0.7} onPress={handleClear}>
-            <Text style={[Typography.caption, styles.clearText]}>Clear</Text>
-          </TouchableOpacity>
-        )}
+  const renderHeader = useMemo(
+    () => (
+      <View style={styles.topSection}>
+        <DeviceIdCard />
+        <RemoteConnectCard />
+
+        <View style={styles.recentSectionHeader}>
+          <Text style={[Typography.titleMedium, styles.recentTitle]}>
+            Recent Devices
+          </Text>
+          {hasDevices && (
+            <TouchableOpacity activeOpacity={0.7} onPress={handleClear}>
+              <Text style={[Typography.caption, styles.clearText]}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-    </View>
+    ),
+    [hasDevices]
   );
 
   return (
@@ -79,6 +89,7 @@ export const HomeScreen: React.FC = () => {
           />
         )}
         ListHeaderComponent={renderHeader}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />

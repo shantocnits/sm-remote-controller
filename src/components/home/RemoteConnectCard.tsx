@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Shadows } from '../../theme/shadows';
@@ -9,18 +9,24 @@ import { useAppStore } from '../../store/useAppStore';
 import { getClipboardText } from '../../utils/deviceUtils';
 
 export const RemoteConnectCard: React.FC = () => {
-  const { partnerIdInput, setPartnerIdInput, setActiveTab } = useAppStore();
+  const connectToPartner = useAppStore((state) => state.connectToPartner);
+  const [partnerId, setPartnerId] = useState('');
 
   const handleConnect = () => {
-    setActiveTab('remote');
+    const cleanId = partnerId.replace(/[^0-9]/g, '');
+    if (!cleanId || cleanId.length < 3) {
+      Alert.alert('Partner ID Required', 'Please enter a valid 6-digit Partner ID to connect.');
+      return;
+    }
+    Keyboard.dismiss();
+    connectToPartner(cleanId);
   };
 
   const handlePasteClipboard = async () => {
     const text = await getClipboardText();
     if (text) {
-      // If it contains "ID: XXX" extract or set directly
-      const clean = text.replace(/[^0-9\s]/g, '').trim();
-      setPartnerIdInput(clean || text.trim());
+      const clean = text.replace(/[^0-9]/g, '').trim();
+      setPartnerId(clean || text.trim());
     }
   };
 
@@ -41,9 +47,14 @@ export const RemoteConnectCard: React.FC = () => {
           <TextInput
             placeholder="Partner ID"
             placeholderTextColor={Colors.textGray}
-            value={partnerIdInput}
-            onChangeText={setPartnerIdInput}
-            keyboardType="numeric"
+            value={partnerId}
+            onChangeText={setPartnerId}
+            keyboardType="number-pad"
+            returnKeyType="go"
+            onSubmitEditing={handleConnect}
+            blurOnSubmit={false}
+            autoCorrect={false}
+            autoCapitalize="none"
             style={[Typography.monoText, styles.input]}
           />
         </View>

@@ -74,5 +74,6 @@ if (fs.existsSync(apkSource)) {
       console.log('🔏 Android APK cryptographically signed with v2/v3 signature schemes.');
     } catch (e) {}
   }
+}
 
 console.log('\n🎉 [Build All Completed] All latest files are ready in the "apk/" folder!\n');

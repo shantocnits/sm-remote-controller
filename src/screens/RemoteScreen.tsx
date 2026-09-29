@@ -27,10 +27,34 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const RemoteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveTab } = useAppStore();
+  const connectedDevice = useAppStore((state) => state.connectedDevice);
+  const currentMode = useAppStore((state) => state.currentMode);
+  const setActiveTab = useAppStore((state) => state.setActiveTab);
+
+  const isDesktop =
+    connectedDevice?.type === 'desktop' ||
+    currentMode === 'm2d' ||
+    currentMode === 'd2d';
+
+  const partnerName =
+    connectedDevice?.name ||
+    (isDesktop ? "Shanto's PC" : 'Galaxy S23 Ultra');
+  const partnerCode = connectedDevice?.code || '948 201';
 
   // Session timer
-  const [sessionSeconds, setSessionSeconds] = useState(262);
+  const [sessionSeconds, setSessionSeconds] = useState(1);
+
+  // Live remote cursor position
+  const [cursorPos, setCursorPos] = useState({ x: 190, y: 260 });
+  const [touchActive, setTouchActive] = useState(false);
+
+  // Command history on remote screen
+  const [commandLogs, setCommandLogs] = useState<string[]>([
+    '> P2P Screen Connection Established [Direct PeerJS]',
+    `> Host Device: ${partnerName} (ID: ${partnerCode})`,
+    '> Display: 1920x1080 Ultra HD @ 60 FPS',
+    '> Input System: Keyboard & Remote Mouse Active',
+  ]);
 
   // 1. Video Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -124,11 +148,21 @@ export const RemoteScreen: React.FC = () => {
     setActiveTab('home');
   };
 
+  // Touch handler to simulate remote mouse pointer move
+  const handleTouchScreen = (e: any) => {
+    const { locationX, locationY } = e.nativeEvent;
+    if (locationX && locationY) {
+      setCursorPos({ x: Math.round(locationX), y: Math.round(locationY) });
+      setTouchActive(true);
+      setTimeout(() => setTouchActive(false), 800);
+    }
+  };
+
   // --- 1. Video Recording Action ---
   const toggleRecording = () => {
     if (!isRecording) {
       setIsRecording(true);
-      showToast('🔴 Screen recording started! Capturing desktop/phone feed...', 'danger');
+      showToast('🔴 Screen recording started! Capturing stream...', 'danger');
     } else {
       const dur = formatTimer(recordingSeconds);
       const now = new Date();
@@ -189,12 +223,18 @@ export const RemoteScreen: React.FC = () => {
   };
 
   const handleSendKey = (keyName: string) => {
+    setCommandLogs((prev) => [
+      ...prev.slice(-5),
+      `> Key [${keyName}] sent to remote`,
+    ]);
     showToast(`⌨️ Sent Key: [${keyName}] to remote device`, 'info');
   };
 
   const handleSendTypedText = () => {
     if (!typedText.trim()) return;
-    showToast(`⌨️ Typed: "${typedText}" sent to remote device`, 'success');
+    const txt = typedText.trim();
+    setCommandLogs((prev) => [...prev.slice(-5), `> ${txt}`]);
+    showToast(`⌨️ Typed: "${txt}" sent to remote device`, 'success');
     setTypedText('');
   };
 
@@ -212,18 +252,6 @@ export const RemoteScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-      {/* Full-Screen Stream Background Image matching index.html */}
-      <Image
-        source={{
-          uri: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop',
-        }}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
-
-      {/* Dark overlay */}
-      <View style={styles.darkOverlay} />
 
       {/* Shutter Flash Animation Overlay */}
       <Animated.View
@@ -264,12 +292,27 @@ export const RemoteScreen: React.FC = () => {
           styles.topHeader,
           { paddingTop: Math.max(insets.top + 8, 20) },
         ]}>
-        <View style={styles.liveBadge}>
+        <View style={styles.partnerInfoPill}>
           <LivePulseBadge color={Colors.dangerRed} size={8} />
-          <Text style={[Typography.caption, styles.liveText]}>Live Session</Text>
+          <VectorIcon
+            name={isDesktop ? 'desktop' : 'mobile'}
+            size={14}
+            color={Colors.brandGreen}
+          />
+          <View>
+            <Text style={styles.partnerNameText} numberOfLines={1}>
+              {partnerName}
+            </Text>
+            <Text style={styles.partnerIdText}>ID: {partnerCode}</Text>
+          </View>
         </View>
 
         <View style={styles.headerRightRow}>
+          {/* Stream quality pill */}
+          <View style={styles.streamQualityPill}>
+            <Text style={styles.streamQualityText}>60 FPS • 1080p</Text>
+          </View>
+
           {/* Recording indicator when active */}
           {isRecording && (
             <View style={styles.recBadge}>
@@ -294,27 +337,204 @@ export const RemoteScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Center Device Stream Information Info */}
-      <View style={styles.centerInfo}>
-        <View style={styles.feedCard}>
-          <VectorIcon name="desktop" size={48} color={Colors.brandGreen} />
-          <Text style={[Typography.bodyMedium, styles.feedText]}>
-            Connected to Galaxy S23 Ultra
-          </Text>
-          <Text style={[Typography.caption, styles.subFeedText]}>
-            Streaming at 60 FPS • 1080p Ultra HD
-          </Text>
+      {/* Real-time Interactive Touch Screen Viewport */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleTouchScreen}
+        style={styles.screenViewport}>
+        
+        {isDesktop ? (
+          // ================= DESKTOP OS INTERFACE =================
+          <View style={styles.desktopOSContainer}>
+            {/* Desktop Wallpaper with Cyber Gradient */}
+            <View style={styles.desktopWallpaper} />
 
-          {isRecording && (
-            <View style={styles.recordingPill}>
-              <View style={styles.recDot} />
-              <Text style={styles.recordingPillText}>
-                Recording Screen... {formatTimer(recordingSeconds)}
-              </Text>
+            {/* Desktop Icons column */}
+            <View style={styles.desktopIconsColumn}>
+              <View style={styles.desktopIconItem}>
+                <View style={styles.desktopIconBadge}>
+                  <VectorIcon name="desktop" size={20} color="#60a5fa" />
+                </View>
+                <Text style={styles.desktopIconLabel}>This PC</Text>
+              </View>
+
+              <View style={styles.desktopIconItem}>
+                <View style={[styles.desktopIconBadge, { backgroundColor: '#1e293b' }]}>
+                  <VectorIcon name="folder" size={20} color="#f59e0b" />
+                </View>
+                <Text style={styles.desktopIconLabel}>Files</Text>
+              </View>
+
+              <View style={styles.desktopIconItem}>
+                <View style={[styles.desktopIconBadge, { backgroundColor: '#0f172a' }]}>
+                  <VectorIcon name="keyboard" size={20} color="#38bdf8" />
+                </View>
+                <Text style={styles.desktopIconLabel}>Terminal</Text>
+              </View>
+
+              <View style={styles.desktopIconItem}>
+                <View style={[styles.desktopIconBadge, { backgroundColor: '#111827' }]}>
+                  <VectorIcon name="share" size={20} color={Colors.brandGreen} />
+                </View>
+                <Text style={styles.desktopIconLabel}>SM Controller</Text>
+              </View>
             </View>
-          )}
-        </View>
-      </View>
+
+            {/* Active Remote Window (Windows Terminal / PowerShell) */}
+            <View style={[styles.remoteWindow, Shadows.cardShadow]}>
+              <View style={styles.windowTitleBar}>
+                <View style={styles.windowDots}>
+                  <View style={[styles.dot, { backgroundColor: '#ef4444' }]} />
+                  <View style={[styles.dot, { backgroundColor: '#f59e0b' }]} />
+                  <View style={[styles.dot, { backgroundColor: '#10b981' }]} />
+                </View>
+                <Text style={styles.windowTitle} numberOfLines={1}>
+                  Windows PowerShell — {partnerName}
+                </Text>
+                <View style={{ width: 40 }} />
+              </View>
+
+              <View style={styles.terminalBody}>
+                {commandLogs.map((log, idx) => (
+                  <Text key={idx} style={styles.terminalText}>
+                    {log}
+                  </Text>
+                ))}
+                <View style={styles.terminalInputLine}>
+                  <Text style={styles.terminalPrompt}>PS C:\Users\Admin&gt;</Text>
+                  <Text style={styles.terminalTypingPreview}>
+                    {typedText || ' '}
+                  </Text>
+                  <View style={styles.blinkingCursor} />
+                </View>
+              </View>
+            </View>
+
+            {/* Simulated Remote Mouse Pointer */}
+            <View
+              pointerEvents="none"
+              style={[
+                styles.virtualCursor,
+                {
+                  left: Math.max(10, Math.min(cursorPos.x - 8, SCREEN_WIDTH - 40)),
+                  top: Math.max(10, cursorPos.y - 12),
+                },
+              ]}>
+              <VectorIcon name="arrow-right" size={22} color={Colors.brandGreen} />
+              {touchActive && (
+                <View style={styles.cursorCoordinates}>
+                  <Text style={styles.cursorCoordinatesText}>
+                    {cursorPos.x}, {cursorPos.y}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Windows 11 Taskbar */}
+            <View style={styles.desktopTaskbar}>
+              <View style={styles.taskbarCenterRow}>
+                <View style={styles.taskbarAppIconActive}>
+                  <VectorIcon name="desktop" size={16} color={Colors.brandGreen} />
+                </View>
+                <View style={styles.taskbarAppIcon}>
+                  <VectorIcon name="folder" size={16} color="#f59e0b" />
+                </View>
+                <View style={styles.taskbarAppIcon}>
+                  <VectorIcon name="keyboard" size={16} color="#38bdf8" />
+                </View>
+              </View>
+              <View style={styles.taskbarTray}>
+                <VectorIcon name="wifi" size={12} color="#94a3b8" />
+                <Text style={styles.taskbarClock}>
+                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          // ================= MOBILE OS INTERFACE =================
+          <View style={styles.mobileOSContainer}>
+            {/* Phone Status Bar */}
+            <View style={styles.phoneStatusBar}>
+              <Text style={styles.phoneStatusTime}>
+                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              <View style={styles.phoneStatusIcons}>
+                <Text style={styles.phoneStatus5G}>5G</Text>
+                <VectorIcon name="wifi" size={12} color="#ffffff" />
+                <Text style={styles.phoneStatusBattery}>98%</Text>
+              </View>
+            </View>
+
+            {/* Phone Widgets & Content */}
+            <View style={styles.phoneContent}>
+              <View style={styles.phoneWeatherWidget}>
+                <Text style={styles.phoneWeatherTemp}>31°C</Text>
+                <Text style={styles.phoneWeatherCity}>Pabna • Sunny</Text>
+              </View>
+
+              <View style={styles.phoneSearchWidget}>
+                <VectorIcon name="keyboard" size={16} color={Colors.brandGreen} />
+                <Text style={styles.phoneSearchText}>Search apps & web...</Text>
+              </View>
+
+              {/* Live Terminal Session card on phone */}
+              <View style={styles.phoneSessionCard}>
+                <Text style={styles.phoneSessionHeader}>🔴 Live Screen Feed Active</Text>
+                {commandLogs.slice(-3).map((log, idx) => (
+                  <Text key={idx} style={styles.phoneLogText} numberOfLines={1}>
+                    {log}
+                  </Text>
+                ))}
+              </View>
+
+              {/* App Icons Grid */}
+              <View style={styles.phoneAppGrid}>
+                <View style={styles.phoneAppItem}>
+                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#10b981' }]}>
+                    <VectorIcon name="phone" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={styles.phoneAppLabel}>Phone</Text>
+                </View>
+                <View style={styles.phoneAppItem}>
+                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#3b82f6' }]}>
+                    <VectorIcon name="chat" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={styles.phoneAppLabel}>Messages</Text>
+                </View>
+                <View style={styles.phoneAppItem}>
+                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#f97316' }]}>
+                    <VectorIcon name="camera" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={styles.phoneAppLabel}>Gallery</Text>
+                </View>
+                <View style={styles.phoneAppItem}>
+                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#6366f1' }]}>
+                    <VectorIcon name="settings" size={18} color="#ffffff" />
+                  </View>
+                  <Text style={styles.phoneAppLabel}>Settings</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Virtual Touch Ripple Pointer */}
+            <View
+              pointerEvents="none"
+              style={[
+                styles.virtualTouchDot,
+                {
+                  left: Math.max(10, cursorPos.x - 16),
+                  top: Math.max(10, cursorPos.y - 16),
+                },
+              ]}>
+              <View style={styles.touchRippleInner} />
+            </View>
+
+            {/* Phone Home Bar */}
+            <View style={styles.phoneHomeBar} />
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Floating Action Toolbar */}
       <View
@@ -653,46 +873,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     zIndex: 20,
   },
-  liveBadge: {
+  partnerInfoPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.borderDark,
     gap: 8,
+    maxWidth: '55%',
   },
-  liveText: {
+  partnerNameText: {
     color: Colors.textWhite,
     fontWeight: '700',
+    fontSize: 12,
+  },
+  partnerIdText: {
+    color: Colors.brandGreen,
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
+  streamQualityPill: {
+    backgroundColor: 'rgba(45, 212, 191, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+  },
+  streamQualityText: {
+    color: Colors.brandGreen,
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   headerRightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   recBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.dangerRed,
-    gap: 6,
+    gap: 5,
   },
   recDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.dangerRed,
   },
   recText: {
     color: Colors.dangerRed,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
   },
@@ -701,7 +943,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.6)',
@@ -714,9 +956,9 @@ const styles = StyleSheet.create({
   },
   timeBadge: {
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.borderDark,
   },
@@ -724,50 +966,340 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontFamily: 'monospace',
     fontWeight: '600',
+    fontSize: 11,
   },
-  centerInfo: {
+
+  // Viewport styles
+  screenViewport: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+
+  // Desktop OS styles
+  desktopOSContainer: {
+    flex: 1,
+    backgroundColor: '#0a0d14',
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  desktopWallpaper: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#07090e',
+    opacity: 0.9,
+  },
+  desktopIconsColumn: {
+    position: 'absolute',
+    left: 14,
+    top: 60,
+    gap: 16,
+    zIndex: 10,
+  },
+  desktopIconItem: {
+    alignItems: 'center',
+    width: 60,
+  },
+  desktopIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#1e293b',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-  },
-  feedCard: {
-    backgroundColor: 'rgba(12, 15, 20, 0.75)',
-    borderRadius: 24,
+    marginBottom: 4,
     borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.3)',
-    paddingVertical: 24,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  feedText: {
-    color: Colors.textWhite,
-    marginTop: 14,
-    fontWeight: '700',
-    fontSize: 15,
+  desktopIconLabel: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    textAlign: 'center',
+    fontWeight: '500',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  subFeedText: {
-    color: Colors.brandGreen,
-    marginTop: 4,
-    fontSize: 12,
+  remoteWindow: {
+    alignSelf: 'center',
+    width: '82%',
+    maxWidth: 420,
+    height: 240,
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.35)',
+    marginTop: 70,
+    marginLeft: 40,
+    overflow: 'hidden',
+    zIndex: 15,
   },
-  recordingPill: {
+  windowTitleBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.dangerRed,
-    marginTop: 12,
-    gap: 6,
+    justifyContent: 'space-between',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  recordingPillText: {
-    color: '#ff8080',
+  windowDots: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  dot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  windowTitle: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+    flex: 1,
+    textAlign: 'center',
+  },
+  terminalBody: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: '#020617',
+    gap: 4,
+  },
+  terminalText: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  terminalInputLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  terminalPrompt: {
+    color: '#10b981',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+  },
+  terminalTypingPreview: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginLeft: 4,
+  },
+  blinkingCursor: {
+    width: 6,
+    height: 12,
+    backgroundColor: Colors.brandGreen,
+    marginLeft: 2,
+  },
+  virtualCursor: {
+    position: 'absolute',
+    zIndex: 40,
+    alignItems: 'flex-start',
+  },
+  cursorCoordinates: {
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.brandGreen,
+    marginTop: 2,
+    marginLeft: 14,
+  },
+  cursorCoordinatesText: {
+    color: Colors.brandGreen,
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+  },
+  desktopTaskbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 44,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 20,
+  },
+  taskbarCenterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  taskbarAppIconActive: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(45, 212, 191, 0.15)',
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.brandGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskbarAppIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskbarTray: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  taskbarClock: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+
+  // Mobile OS styles
+  mobileOSContainer: {
+    flex: 1,
+    backgroundColor: '#0c0f17',
+    paddingHorizontal: 18,
+    justifyContent: 'space-between',
+  },
+  phoneStatusBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 65,
+    paddingHorizontal: 8,
+  },
+  phoneStatusTime: {
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  phoneStatusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  phoneStatus5G: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  phoneStatusBattery: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  phoneContent: {
+    flex: 1,
+    paddingTop: 16,
+    gap: 14,
+  },
+  phoneWeatherWidget: {
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  phoneWeatherTemp: {
+    color: '#ffffff',
+    fontSize: 32,
+    fontWeight: '800',
+  },
+  phoneWeatherCity: {
+    color: Colors.brandGreen,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  phoneSearchWidget: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  phoneSearchText: {
+    color: '#94a3b8',
+    fontSize: 12,
+  },
+  phoneSessionCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.25)',
+    gap: 4,
+  },
+  phoneSessionHeader: {
+    color: Colors.brandGreen,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  phoneLogText: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  phoneAppGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
+  },
+  phoneAppItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  phoneAppIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phoneAppLabel: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  virtualTouchDot: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(45, 212, 191, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 40,
+  },
+  touchRippleInner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.brandGreen,
+  },
+  phoneHomeBar: {
+    width: 120,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ffffff',
+    opacity: 0.5,
+    alignSelf: 'center',
+    marginBottom: 75,
   },
   toolbarWrapper: {
     position: 'absolute',
