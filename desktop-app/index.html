@@ -215,7 +215,7 @@
                 <div class="flex bg-appBg rounded-2xl p-3 border border-gray-800 mb-4 text-center">
                     <div class="flex-1">
                         <p class="text-[10px] text-textGray">Current Version</p>
-                        <p id="app-current-ver-text" class="text-sm font-bold font-mono">v1.0.0</p>
+                        <p id="app-current-ver-text" class="text-sm font-bold font-mono">v1.2.0</p>
                     </div>
                     <div class="w-[1px] bg-gray-800"></div>
                     <div class="flex-1">
@@ -346,7 +346,7 @@
                     <div>
                         <h1 class="text-xl font-bold tracking-wide">SM <span class="text-brandGreen">CONTROLLER</span></h1>
                         <p class="text-[11px] font-semibold text-brandGreen mt-0.5 tracking-wider">dev: Khandaker shanto</p>
-                        <p id="app-header-version" class="text-[9px] text-textGray mt-0.5 font-mono">Version 1.0.0</p>
+                        <p id="app-header-version" class="text-[9px] text-textGray mt-0.5 font-mono">Version 1.2.0</p>
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -682,7 +682,7 @@
 
     <!-- JavaScript Logics -->
     <script>
-        let currentAppVersion = "1.0.0";
+        let currentAppVersion = "1.2.0";
         let isScreenRecording = false;
         let recordingTimer = null;
         let recordingSeconds = 0;
@@ -883,65 +883,168 @@
             document.getElementById('app-current-ver-text').innerText = 'v' + currentAppVersion;
             document.getElementById('app-header-version').innerText = 'Version ' + currentAppVersion;
 
-            try {
-                const res = await fetch('https://raw.githubusercontent.com/shantocnits/sm-remote-controller/main/version.json?t=' + Date.now());
-                if (res.ok) {
-                    const data = await res.json();
-                    const latestVer = data.version || '1.0.0';
-                    const tag = document.getElementById('github-latest-ver-text');
-                    if (tag) tag.innerText = 'v' + latestVer;
+            function compareVer(a, b) {
+                const pa = (a || '0').replace(/^v/, '').split('.').map(Number);
+                const pb = (b || '0').replace(/^v/, '').split('.').map(Number);
+                for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                    const na = pa[i] || 0, nb = pb[i] || 0;
+                    if (na > nb) return 1;
+                    if (na < nb) return -1;
+                }
+                return 0;
+            }
 
-                    if (data.changelog && Array.isArray(data.changelog)) {
-                        const changelogBox = document.getElementById('changelog-container');
-                        if (changelogBox) {
-                            changelogBox.innerHTML = data.changelog.map(item => `<p>• ${item}</p>`).join('');
-                        }
+            const endpoints = [
+                'https://raw.githubusercontent.com/shantocnits/sm-remote-controller/main/version.json',
+                'https://cdn.jsdelivr.net/gh/shantocnits/sm-remote-controller@main/version.json',
+                'https://fastly.jsdelivr.net/gh/shantocnits/sm-remote-controller@main/version.json'
+            ];
+
+            let updateData = null;
+
+            // 1. Try CDN and raw mirrors
+            for (const ep of endpoints) {
+                try {
+                    const controller = new AbortController();
+                    const tId = setTimeout(() => controller.abort(), 3500);
+                    const res = await fetch(ep + '?t=' + Date.now(), {
+                        signal: controller.signal,
+                        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                    });
+                    clearTimeout(tId);
+                    if (res.ok) {
+                        updateData = await res.json();
+                        break;
                     }
+                } catch (e) {
+                    // Try next mirror
+                }
+            }
 
-                    function compareVer(a, b) {
-                        const pa = a.split('.').map(Number);
-                        const pb = b.split('.').map(Number);
-                        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-                            const na = pa[i] || 0, nb = pb[i] || 0;
-                            if (na > nb) return 1;
-                            if (na < nb) return -1;
+            // 2. Try GitHub Releases API fallback if mirrors failed
+            if (!updateData) {
+                try {
+                    const controller = new AbortController();
+                    const tId = setTimeout(() => controller.abort(), 3500);
+                    const apiRes = await fetch('https://api.github.com/repos/shantocnits/sm-remote-controller/releases/latest', {
+                        signal: controller.signal,
+                        headers: { 'User-Agent': 'SM-Remote-Controller-Desktop' }
+                    });
+                    clearTimeout(tId);
+                    if (apiRes.ok) {
+                        const rel = await apiRes.json();
+                        const rawTag = rel.tag_name || '1.0.0';
+                        const latestVer = rawTag.replace(/^v/, '');
+                        let exeUrl = `https://github.com/shantocnits/sm-remote-controller/releases/download/${rawTag}/SM_Remote_Controller.exe`;
+                        if (Array.isArray(rel.assets)) {
+                            const found = rel.assets.find(a => a.name && a.name.endsWith('.exe'));
+                            if (found && found.browser_download_url) exeUrl = found.browser_download_url;
                         }
-                        return 0;
+                        const changelogLines = rel.body
+                            ? rel.body.split('\n').map(l => l.trim().replace(/^[-*•]\s*/, '')).filter(l => l.length > 0 && !l.startsWith('#'))
+                            : ['🚀 New release update available on GitHub'];
+
+                        updateData = {
+                            version: latestVer,
+                            exeUrl: exeUrl,
+                            downloadUrl: exeUrl,
+                            changelog: changelogLines
+                        };
                     }
+                } catch (e) {
+                    // API failed
+                }
+            }
 
-                    if (compareVer(latestVer, currentAppVersion) > 0) {
-                        const statusTag = document.getElementById('update-status-tag');
-                        if (statusTag) statusTag.innerText = '🔥 New Update Available (v' + latestVer + ')';
-                        const actionContainer = document.getElementById('update-action-container');
-                        if (actionContainer) {
-                            actionContainer.innerHTML = `
-                                <button onclick="triggerUpdateDownload('${latestVer}', '${data.downloadUrl || ''}')" class="w-full py-3 rounded-xl bg-brandGreen text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
-                                    <i class="fa-solid fa-download"></i> Update Now (v${latestVer})
-                                </button>
-                            `;
-                        }
-                    } else {
-                        renderUpToDateState(currentAppVersion);
+            // 3. Process Result
+            if (updateData && updateData.version) {
+                const latestVer = updateData.version;
+                const tag = document.getElementById('github-latest-ver-text');
+                if (tag) {
+                    tag.innerText = 'v' + latestVer;
+                    tag.className = 'text-sm font-bold font-mono text-brandGreen';
+                }
+
+                if (updateData.changelog && Array.isArray(updateData.changelog)) {
+                    const changelogBox = document.getElementById('changelog-container');
+                    if (changelogBox) {
+                        changelogBox.innerHTML = updateData.changelog.map(item => `<p>• ${item}</p>`).join('');
                     }
                 }
-            } catch (e) {
-                renderUpToDateState(currentAppVersion);
-            } finally {
-                setTimeout(() => {
-                    if (spinIcon) spinIcon.classList.remove('fa-spin');
-                }, 600);
+
+                if (compareVer(latestVer, currentAppVersion) > 0) {
+                    const statusTag = document.getElementById('update-status-tag');
+                    if (statusTag) {
+                        statusTag.innerText = '🔥 New Update Available (v' + latestVer + ')';
+                        statusTag.className = 'text-xs text-brandGreen font-medium';
+                    }
+                    const actionContainer = document.getElementById('update-action-container');
+                    const targetDownloadUrl = updateData.exeUrl || updateData.downloadUrl || '';
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `
+                            <button onclick="triggerUpdateDownload('${latestVer}', '${targetDownloadUrl}')" class="w-full py-3 rounded-xl bg-brandGreen text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
+                                <i class="fa-solid fa-download"></i> Update Now (v${latestVer})
+                            </button>
+                        `;
+                    }
+                } else {
+                    renderUpToDateState(currentAppVersion);
+                }
+            } else {
+                renderErrorState();
+            }
+
+            if (spinIcon) {
+                setTimeout(() => spinIcon.classList.remove('fa-spin'), 600);
             }
         }
 
         function renderUpToDateState(ver) {
             const statusTag = document.getElementById('update-status-tag');
-            if (statusTag) statusTag.innerText = '✓ You are on latest version';
+            if (statusTag) {
+                statusTag.innerText = '✓ You are on latest version';
+                statusTag.className = 'text-xs text-brandGreen font-medium';
+            }
+            const tag = document.getElementById('github-latest-ver-text');
+            if (tag) {
+                tag.innerText = 'v' + ver;
+                tag.className = 'text-sm font-bold font-mono text-brandGreen';
+            }
             const actionContainer = document.getElementById('update-action-container');
             if (actionContainer) {
                 actionContainer.innerHTML = `
                     <div class="w-full py-2.5 rounded-xl bg-brandGreen/10 border border-brandGreen/30 text-center text-brandGreen text-xs font-bold flex items-center justify-center gap-2">
                         <i class="fa-solid fa-check"></i> You are on the latest version (v${ver})
                     </div>
+                `;
+            }
+        }
+
+        function renderErrorState() {
+            const statusTag = document.getElementById('update-status-tag');
+            if (statusTag) {
+                statusTag.innerText = '⚠️ Connection / Repo Visibility Error';
+                statusTag.className = 'text-xs text-red-400 font-medium';
+            }
+            const tag = document.getElementById('github-latest-ver-text');
+            if (tag) {
+                tag.innerText = 'Failed';
+                tag.className = 'text-sm font-bold font-mono text-red-400';
+            }
+            const changelogBox = document.getElementById('changelog-container');
+            if (changelogBox) {
+                changelogBox.innerHTML = `
+                    <p class="text-red-400 font-semibold">• ⚠️ Unable to reach GitHub update server.</p>
+                    <p>• 📌 Ensure your internet is active.</p>
+                    <p>• 🔒 Make sure repository "shantocnits/sm-remote-controller" is PUBLIC on GitHub Settings so the app can fetch updates.</p>
+                `;
+            }
+            const actionContainer = document.getElementById('update-action-container');
+            if (actionContainer) {
+                actionContainer.innerHTML = `
+                    <button onclick="checkUpdatesOnline()" class="w-full py-2.5 rounded-xl bg-gray-700 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-gray-600 transition">
+                        <i class="fa-solid fa-arrows-rotate"></i> Retry Update Check
+                    </button>
                 `;
             }
         }

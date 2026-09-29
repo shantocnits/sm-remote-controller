@@ -133,7 +133,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }, 300);
   };
 
-  const isUpToDate = (!updateInfo.hasUpdate || isUpdated) && !loading;
+  const hasError = !!updateInfo.error && !loading;
+  const isUpToDate = (!updateInfo.hasUpdate || isUpdated) && !loading && !hasError;
 
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
@@ -147,11 +148,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <View style={[styles.iconCircle, isUpToDate && styles.iconCircleGreen]}>
+              <View style={[styles.iconCircle, isUpToDate && styles.iconCircleGreen, hasError && { borderColor: '#ef4444' }]}>
                 {loading ? (
                   <Animated.View style={{ transform: [{ rotate: spin }] }}>
                     <VectorIcon name="update" size={20} color={Colors.brandGreen} />
                   </Animated.View>
+                ) : hasError ? (
+                  <VectorIcon name="alert" size={20} color="#ef4444" />
                 ) : (
                   <VectorIcon
                     name={isUpToDate ? 'check' : 'download'}
@@ -162,9 +165,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </View>
               <View>
                 <Text style={[Typography.titleMedium, styles.title]}>App Updates</Text>
-                <Text style={styles.versionStatus}>
+                <Text style={[styles.versionStatus, hasError && { color: '#ef4444' }]}>
                   {loading
                     ? 'Scanning GitHub for updates...'
+                    : hasError
+                    ? '⚠️ Connection / Repo Visibility Error'
                     : isUpToDate
                     ? '✓ You are on latest version'
                     : '🔥 New Update Available!'}
@@ -188,15 +193,17 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
             <View style={styles.versionCol}>
               <Text style={styles.versionLabel}>Latest on GitHub</Text>
-              <Text style={[styles.versionValue, { color: Colors.brandGreen }]}>
-                v{updateInfo.latestVersion}
+              <Text style={[styles.versionValue, { color: hasError ? '#ef4444' : Colors.brandGreen }]}>
+                {hasError ? 'Failed' : `v${updateInfo.latestVersion}`}
               </Text>
             </View>
           </View>
 
           {/* Changelog Title */}
           <View style={styles.changelogHeader}>
-            <Text style={styles.changelogTitle}>What's New in this Release:</Text>
+            <Text style={styles.changelogTitle}>
+              {hasError ? 'Update Check Notice:' : "What's New in this Release:"}
+            </Text>
             <TouchableOpacity
               onPress={check}
               disabled={loading}
@@ -214,8 +221,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           <ScrollView style={styles.changelogList} showsVerticalScrollIndicator={false}>
             {updateInfo.changelog.map((item, index) => (
               <View key={index} style={styles.changelogItem}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.changelogText}>{item}</Text>
+                <Text style={[styles.bulletDot, hasError && { color: '#ef4444' }]}>•</Text>
+                <Text style={[styles.changelogText, hasError && { color: '#e5e7eb' }]}>{item}</Text>
               </View>
             ))}
           </ScrollView>
@@ -233,8 +240,19 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             </View>
           )}
 
-          {/* Action Button: Only Update Button if update available, otherwise Up To Date banner */}
-          {!isUpToDate ? (
+          {/* Action Button */}
+          {hasError ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={check}
+              disabled={loading}
+              style={[styles.updateBtn, { backgroundColor: '#374151' }]}>
+              <VectorIcon name="update" size={16} color="#ffffff" />
+              <Text style={[styles.updateBtnText, { color: '#ffffff' }]}>
+                {loading ? 'Checking...' : 'Retry Update Check'}
+              </Text>
+            </TouchableOpacity>
+          ) : !isUpToDate ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleDownloadUpdate}
@@ -255,8 +273,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </Text>
             </View>
           )}
-
-
         </View>
       </View>
     </Modal>

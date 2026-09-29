@@ -140,7 +140,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set((state) => ({ isModeDropdownOpen: !state.isModeDropdownOpen })),
 
   // App Version
-  appVersion: '1.0.0',
+  appVersion: '1.2.0',
   setAppVersion: (ver: string) => set({ appVersion: ver }),
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
