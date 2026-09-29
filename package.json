@@ -6,6 +6,8 @@
     "android": "node scripts/run-android.js",
     "ios": "react-native run-ios",
     "start": "react-native start",
+    "build:all": "node scripts/build_all.js",
+    "build:apk": "cd android && .\\gradlew assembleDebug && cd .. && node scripts/build_all.js",
     "postinstall": "node scripts/fix-cli.js",
     "lint": "eslint ."
   },
