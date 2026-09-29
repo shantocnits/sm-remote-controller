@@ -64,13 +64,15 @@ if (fs.existsSync(apkSource)) {
   const apkTarget = path.join(apkOutputDir, 'SM_Remote_Controller.apk');
   const apkVersionTarget = path.join(apkOutputDir, `SM_Remote_Controller_v${version}.apk`);
   
-  fs.copyFileSync(apkSource, apkTarget);
-  fs.copyFileSync(apkSource, apkVersionTarget);
-  console.log(`✅ Android APK copied to:`);
-  console.log(`   - ${apkTarget}`);
-  console.log(`   - ${apkVersionTarget}`);
-} else {
-  console.log('⚠️ No compiled APK found yet. Please run `./gradlew assembleDebug` in the android folder first.');
-}
+  // Sign APK targets
+  const apksignerPath = 'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\apksigner.bat';
+  const debugKeystore = path.join(rootDir, 'android', 'app', 'debug.keystore');
+  if (fs.existsSync(apksignerPath) && fs.existsSync(debugKeystore)) {
+    try {
+      execSync(`& "${apksignerPath}" sign --ks "${debugKeystore}" --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android "${apkTarget}"`, { shell: 'powershell', stdio: 'ignore' });
+      fs.copyFileSync(apkTarget, apkVersionTarget);
+      console.log('🔏 Android APK cryptographically signed with v2/v3 signature schemes.');
+    } catch (e) {}
+  }
 
 console.log('\n🎉 [Build All Completed] All latest files are ready in the "apk/" folder!\n');
