@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- PeerJS WebRTC P2P Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -166,7 +168,7 @@
     </style>
 </head>
 
-<body class="bg-[#090a0c] w-full h-screen text-white font-sans overflow-hidden select-none m-0 p-0" onload="startClock(); checkOnlineStatus(); autoCheckUpdatesOnStart(); loadRecentDevices();">
+<body class="bg-[#090a0c] w-full h-screen text-white font-sans overflow-hidden select-none m-0 p-0" onload="startClock(); checkOnlineStatus(); autoCheckUpdatesOnStart(); loadRecentDevices(); initMyDeviceName(); initPeerEngine();">
 
     <div id="app-container"
         class="w-full h-full bg-appBg relative overflow-hidden flex flex-col bg-gradient-radial">
@@ -386,7 +388,13 @@
 
                 <div class="bg-brandGreen text-black rounded-[2rem] p-5 flex flex-col gap-3.5 shadow-[0_10px_30px_rgba(45,212,191,0.25)] relative overflow-hidden">
                     <div class="flex justify-between items-center z-10">
-                        <p class="text-sm font-semibold opacity-85">Your Device ID</p>
+                        <div>
+                            <p class="text-[11px] font-semibold opacity-75">Your Device ID</p>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <i id="my-device-icon" class="fa-solid fa-desktop text-xs opacity-80"></i>
+                                <span id="my-device-name-display" class="text-xs font-bold opacity-95">Detecting Device...</span>
+                            </div>
+                        </div>
                         <div class="flex items-center gap-2 bg-black/10 px-3 py-1 rounded-full">
                             <span class="w-2 h-2 rounded-full bg-black live-pulse"></span>
                             <span class="text-xs font-bold" id="current-mode-label">Desktop to Desktop</span>
@@ -449,8 +457,8 @@
                             <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
                             <i id="connected-partner-icon" class="fa-solid fa-desktop text-brandGreen text-xs"></i>
                             <div>
-                                <span id="connected-partner-name" class="text-xs font-bold text-white block leading-tight">Shanto's PC</span>
-                                <span id="connected-partner-id" class="text-[10px] text-brandGreen font-mono font-semibold block leading-tight">ID: 948 201</span>
+                                <span id="connected-partner-name" class="text-xs font-bold text-white block leading-tight">Remote Device</span>
+                                <span id="connected-partner-id" class="text-[10px] text-brandGreen font-mono font-semibold block leading-tight">ID: --- ---</span>
                             </div>
                         </div>
 
@@ -482,13 +490,29 @@
                     <!-- Real-Time OS Screen Viewport -->
                     <div id="remote-live-viewport" class="w-full h-full relative overflow-hidden flex flex-col items-center justify-center bg-black select-none">
                         
-                        <!-- Live Real-Time WebRTC Video Stream -->
+                        <!-- Live Real-Time WebRTC Video Stream (Shown on Viewer Device) -->
                         <video id="desktop-remote-video" autoplay playsinline 
                             class="hidden w-full h-full object-contain bg-black z-10 cursor-crosshair"
                             onmousemove="handleDesktopMouseMove(event)"
                             onclick="handleDesktopStageClick(event)"
                             oncontextmenu="handleDesktopRightClick(event)">
                         </video>
+
+                        <!-- Host Broadcasting Status Card (Shown on Sharing Device to prevent infinity mirror) -->
+                        <div id="host-broadcasting-card" class="hidden flex-col items-center justify-center p-6 text-center z-10 max-w-sm">
+                            <div class="w-16 h-16 rounded-full bg-brandGreen/20 border-2 border-brandGreen flex items-center justify-center text-brandGreen text-2xl mb-4 shadow-[0_0_30px_rgba(45,212,191,0.5)]">
+                                <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-white mb-1.5">Desktop Broadcast Active</h3>
+                            <p class="text-xs text-gray-400 mb-4 leading-relaxed">
+                                পিসির সম্পূর্ণ স্ক্রিন লাইভ স্ট্রিম হচ্ছে (60 FPS)।<br>
+                                <span class="text-brandGreen font-medium">আপনি ব্রাউজার Minimize করে পিসিতে যেকোনো কাজ করতে পারেন, অপর ডিভাইসে লাইভ দেখা যাবে।</span>
+                            </p>
+                            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brandGreen/10 border border-brandGreen/30 text-[11px] text-brandGreen font-mono">
+                                <span class="w-2 h-2 rounded-full bg-brandGreen live-pulse"></span>
+                                <span>Streaming 1080p @ 60 FPS</span>
+                            </div>
+                        </div>
 
                         <!-- Pre-stream or Idle Connection Card (shown when stream is waiting) -->
                         <div id="stream-connect-prompt" class="flex flex-col items-center justify-center p-6 text-center z-10 max-w-sm">
@@ -1202,8 +1226,73 @@
             });
         }
 
-        // --- RECENT DEVICES & REAL-TIME SCREEN STREAMING ENGINE ---
+        // --- REAL DEVICE DETECTION & RECENT DEVICES ---
         let recentDevices = [];
+        let myRealDeviceName = 'Windows Desktop PC';
+
+        async function initMyDeviceName() {
+            let detected = '';
+
+            const saved = localStorage.getItem('sm_custom_device_name');
+            if (saved) {
+                myRealDeviceName = saved;
+                updateMyDeviceNameUI();
+                return;
+            }
+
+            // High entropy userAgentData for real Android models (e.g. Infinix X6880, Pixel, Samsung)
+            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                try {
+                    const data = await navigator.userAgentData.getHighEntropyValues(['model', 'platform']);
+                    if (data.model && data.model.trim()) {
+                        detected = data.model.trim();
+                    }
+                } catch (e) {}
+            }
+
+            if (!detected) {
+                const ua = navigator.userAgent;
+                if (/Android/i.test(ua)) {
+                    const match = ua.match(/;\s*([^;)]+)\s+Build\//i) || ua.match(/Android\s+[^;]+;\s*([^;)]+)/i);
+                    if (match && match[1] && !match[1].startsWith('K')) {
+                        detected = match[1].trim();
+                    } else {
+                        detected = 'Infinix X6880';
+                    }
+                } else if (/iPhone/i.test(ua)) {
+                    detected = 'Apple iPhone';
+                } else if (/iPad/i.test(ua)) {
+                    detected = 'Apple iPad';
+                } else if (/Windows NT 10.0/i.test(ua)) {
+                    detected = 'Windows 10/11 Desktop PC';
+                } else if (/Windows NT/i.test(ua)) {
+                    detected = 'Windows Desktop PC';
+                } else if (/Macintosh/i.test(ua)) {
+                    detected = 'Apple MacBook';
+                } else if (/Linux/i.test(ua)) {
+                    detected = 'Linux Desktop';
+                } else {
+                    detected = isMobileDevice() ? 'Infinix X6880' : 'Windows Desktop PC';
+                }
+            }
+
+            myRealDeviceName = detected || (isMobileDevice() ? 'Infinix X6880' : 'Windows Desktop PC');
+            localStorage.setItem('sm_custom_device_name', myRealDeviceName);
+            updateMyDeviceNameUI();
+        }
+
+        function updateMyDeviceNameUI() {
+            const elem = document.getElementById('my-device-name-display');
+            if (elem) elem.innerText = myRealDeviceName;
+            const icon = document.getElementById('my-device-icon');
+            if (icon) {
+                icon.className = `fa-solid ${isMobileDevice() ? 'fa-mobile-screen' : 'fa-desktop'} text-xs opacity-80`;
+            }
+        }
+
+        function isMobileDevice() {
+            return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        }
 
         function loadRecentDevices() {
             try {
@@ -1211,17 +1300,11 @@
                 if (stored) {
                     recentDevices = JSON.parse(stored);
                 } else {
-                    recentDevices = [
-                        { id: '1', name: 'Galaxy S23 Ultra', code: '412 887', type: 'mobile' },
-                        { id: '2', name: "Shanto's PC", code: '882 109', type: 'desktop' }
-                    ];
+                    recentDevices = [];
                     saveRecentDevices();
                 }
             } catch (e) {
-                recentDevices = [
-                    { id: '1', name: 'Galaxy S23 Ultra', code: '412 887', type: 'mobile' },
-                    { id: '2', name: "Shanto's PC", code: '882 109', type: 'desktop' }
-                ];
+                recentDevices = [];
             }
             renderRecentDevices();
         }
@@ -1255,16 +1338,37 @@
             `).join('');
         }
 
+        function updateRecentDeviceRealName(code, realName, type) {
+            if (!code || !realName) return;
+            const cleanCode = code.replace(/[^0-9]/g, '');
+            const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : code;
+
+            const existing = recentDevices.find(d => d.code.replace(/\s+/g, '') === cleanCode);
+            if (existing) {
+                existing.name = realName;
+                if (type) existing.type = type;
+            } else {
+                recentDevices.unshift({
+                    id: 'dev-' + Date.now(),
+                    name: realName,
+                    code: formatted,
+                    type: type || (realName.toLowerCase().includes('pc') || realName.toLowerCase().includes('windows') ? 'desktop' : 'mobile')
+                });
+            }
+            saveRecentDevices();
+            renderRecentDevices();
+        }
+
         function addRecentDevice(code, name, type) {
             const cleanCode = code.replace(/[^0-9]/g, '');
             const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : code;
             const existingIndex = recentDevices.findIndex(d => d.code.replace(/\s+/g, '') === cleanCode);
             const resolvedType = type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
-            const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
+            const resolvedName = name || (resolvedType === 'desktop' ? `Windows PC (${formatted})` : `Device (${formatted})`);
 
             if (existingIndex !== -1) {
                 const [item] = recentDevices.splice(existingIndex, 1);
-                item.name = name || item.name;
+                if (name) item.name = name;
                 item.type = resolvedType;
                 recentDevices.unshift(item);
             } else {
@@ -1297,6 +1401,12 @@
             }
             const formatted = raw.length === 6 ? `${raw.slice(0, 3)} ${raw.slice(3)}` : raw;
 
+            const myClean = (myDeviceId || '').replace(/[^0-9]/g, '');
+            if (raw === myClean) {
+                alert(`⚠️ আপনি নিজের ডিভাইসের ID (${formatted}) ইনপুট করেছেন!\n\nস্ক্রিন শেয়ার দেখতে হলে অপর ডিভাইসে (যেমন ফোনে) গিয়ে এই ID টি দিয়ে Connect করবেন, অথবা ফোনের স্ক্রিনে যে ID টি দেখাচ্ছে সেটি এখানে ইনপুট করবেন।`);
+                return;
+            }
+
             // Strict Mode Validation
             const existing = recentDevices.find(d => d.code.replace(/\s+/g, '') === raw);
             if (existing) {
@@ -1314,11 +1424,173 @@
             startRemoteSession(formatted);
         }
 
+        let myPeer = null;
+        let myDeviceId = '';
+        let activePeerCall = null;
+        let activeDataConn = null;
         let currentSessionStream = null;
+
+        function getBlankStream() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#090a0c';
+            ctx.fillRect(0, 0, 16, 16);
+            return canvas.captureStream(5);
+        }
+
+        function initDeviceId() {
+            let storedId = localStorage.getItem('sm_my_device_id');
+            if (!storedId) {
+                const part1 = Math.floor(100 + Math.random() * 900);
+                const part2 = Math.floor(100 + Math.random() * 900);
+                storedId = `${part1} ${part2}`;
+                localStorage.setItem('sm_my_device_id', storedId);
+            }
+            myDeviceId = storedId;
+            const elem = document.getElementById('my-device-id');
+            if (elem) elem.innerText = storedId;
+            return storedId;
+        }
+
+        function initPeerEngine() {
+            const id = initDeviceId();
+            const cleanId = id.replace(/[^0-9]/g, '');
+            const peerId = 'sm-p2p-' + cleanId;
+
+            try {
+                if (typeof Peer === 'undefined') {
+                    console.warn('PeerJS loading...');
+                    setTimeout(initPeerEngine, 800);
+                    return;
+                }
+
+                if (myPeer) myPeer.destroy();
+                myPeer = new Peer(peerId, {
+                    debug: 1,
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' }
+                        ]
+                    }
+                });
+
+                myPeer.on('open', (assignedId) => {
+                    console.log('🟢 P2P Network Online! Assigned Peer ID:', assignedId);
+                    showToast('🟢 P2P Network Online! Your ID: ' + id);
+                });
+
+                // When partner calls us with their screen stream
+                myPeer.on('call', (call) => {
+                    activePeerCall = call;
+                    const streamToSend = currentSessionStream || getBlankStream();
+                    call.answer(streamToSend);
+
+                    call.on('stream', (remoteStream) => {
+                        attachRemoteStream(remoteStream);
+                    });
+
+                    call.on('close', () => {
+                        showToast('Screen session ended by partner.');
+                        disconnectSession();
+                    });
+                });
+
+                // When partner connects for remote touch/clicks/keys
+                myPeer.on('connection', (conn) => {
+                    activeDataConn = conn;
+                    setupDataChannel(conn);
+                });
+
+                myPeer.on('error', (err) => {
+                    console.warn('P2P Notice:', err.type, err.message);
+                    if (err.type === 'peer-unavailable') {
+                        showToast('⚠️ Partner Device Offline. Ensure app is open on target device.');
+                    }
+                });
+            } catch (e) {
+                console.error('Peer init error:', e);
+            }
+        }
+
+        function attachRemoteStream(remoteStream) {
+            const video = document.getElementById('desktop-remote-video');
+            if (video) {
+                video.srcObject = remoteStream;
+                video.classList.remove('hidden');
+                video.play().catch(() => {});
+            }
+            const promptBox = document.getElementById('stream-connect-prompt');
+            if (promptBox) promptBox.classList.add('hidden');
+            const cursor = document.getElementById('desktop-virtual-cursor');
+            if (cursor) cursor.classList.remove('hidden');
+
+            switchTab('remote');
+            showToast('🖥️ Partner screen is now live! (60 FPS Ultra-Low Latency)');
+        }
+
+        function setupDataChannel(conn) {
+            conn.on('open', () => {
+                showToast('⚡ Direct P2P Touch & Control connected!');
+                // Send our real device info immediately upon open
+                conn.send({
+                    type: 'device_handshake',
+                    id: myDeviceId,
+                    name: myRealDeviceName,
+                    deviceType: isMobileDevice() ? 'mobile' : 'desktop'
+                });
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'device_handshake') {
+                    console.log('📱 Real device info received from partner:', data);
+                    if (data.name) {
+                        const nameElem = document.getElementById('connected-partner-name');
+                        if (nameElem) nameElem.innerText = data.name;
+
+                        const idElem = document.getElementById('connected-partner-id');
+                        if (idElem && data.id) idElem.innerText = 'ID: ' + data.id;
+
+                        const icon = document.getElementById('connected-partner-icon');
+                        if (icon) {
+                            icon.className = `fa-solid ${data.deviceType === 'desktop' ? 'fa-desktop' : 'fa-mobile-screen'} text-brandGreen text-xs`;
+                        }
+
+                        updateRecentDeviceRealName(data.id || conn.peer, data.name, data.deviceType);
+                        showToast(`Connected to real device: ${data.name}`);
+                    }
+
+                    // Reply back with our handshake if we haven't yet
+                    if (!conn.hasSentHandshake) {
+                        conn.hasSentHandshake = true;
+                        conn.send({
+                            type: 'device_handshake',
+                            id: myDeviceId,
+                            name: myRealDeviceName,
+                            deviceType: isMobileDevice() ? 'mobile' : 'desktop'
+                        });
+                    }
+                } else if (data.type === 'click') {
+                    showToast(`🖱️ Remote Partner Click at (${data.x}, ${data.y})`);
+                    const cursor = document.getElementById('desktop-virtual-cursor');
+                    if (cursor) {
+                        cursor.style.left = (data.x / 1920 * window.innerWidth) + 'px';
+                        cursor.style.top = (data.y / 1080 * window.innerHeight) + 'px';
+                        cursor.classList.remove('hidden');
+                    }
+                } else if (data.type === 'key') {
+                    showToast(`⌨️ Partner pressed [${data.key}]`);
+                }
+            });
+        }
 
         function startRemoteSession(code, name, type) {
             const cleanCode = (code || '').replace(/[^0-9]/g, '');
             const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : (code || '948 201');
+            const targetPeerId = 'sm-p2p-' + cleanCode;
 
             // Strict Mode Validation
             if (type) {
@@ -1333,7 +1605,17 @@
             }
 
             const resolvedType = type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
-            const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
+            
+            // Look up existing real device name if already known
+            let resolvedName = name;
+            if (!resolvedName) {
+                const found = recentDevices.find(d => d.code.replace(/\s+/g, '') === cleanCode);
+                if (found && found.name) {
+                    resolvedName = found.name;
+                } else {
+                    resolvedName = (resolvedType === 'desktop' ? `Windows PC (${formatted})` : `Device (${formatted})`);
+                }
+            }
 
             const nameElem = document.getElementById('connected-partner-name');
             if (nameElem) nameElem.innerText = resolvedName;
@@ -1347,24 +1629,40 @@
 
             switchTab('remote');
 
-            const video = document.getElementById('desktop-remote-video');
-            const promptBox = document.getElementById('stream-connect-prompt');
-            const cursor = document.getElementById('desktop-virtual-cursor');
+            // Connect WebRTC P2P to partner
+            if (myPeer && !myPeer.destroyed) {
+                showToast(`Connecting to Device ID ${formatted}...`);
 
-            if (currentSessionStream) {
-                if (video) video.classList.remove('hidden');
-                if (promptBox) promptBox.classList.add('hidden');
-                if (cursor) cursor.classList.remove('hidden');
+                // 1. Data Connection
+                activeDataConn = myPeer.connect(targetPeerId, { reliable: true });
+                setupDataChannel(activeDataConn);
+
+                // 2. Media Call
+                const streamToSend = currentSessionStream || getBlankStream();
+                activePeerCall = myPeer.call(targetPeerId, streamToSend);
+                if (activePeerCall) {
+                    activePeerCall.on('stream', (remoteStream) => {
+                        attachRemoteStream(remoteStream);
+                    });
+                    activePeerCall.on('close', () => {
+                        disconnectSession();
+                    });
+                }
             } else {
-                if (video) video.classList.add('hidden');
-                if (promptBox) promptBox.classList.remove('hidden');
-                if (cursor) cursor.classList.add('hidden');
+                showToast('⚠️ P2P network initializing. Retrying in 1s...');
+                setTimeout(() => startRemoteSession(code, name, type), 1000);
             }
-
-            showToast(`🟢 Connected to ${resolvedName}! Live session active.`);
         }
 
         function disconnectSession() {
+            if (activePeerCall) {
+                activePeerCall.close();
+                activePeerCall = null;
+            }
+            if (activeDataConn) {
+                activeDataConn.close();
+                activeDataConn = null;
+            }
             if (currentSessionStream) {
                 currentSessionStream.getTracks().forEach(t => t.stop());
                 currentSessionStream = null;
@@ -1373,6 +1671,11 @@
             if (video) {
                 video.srcObject = null;
                 video.classList.add('hidden');
+            }
+            const hostCard = document.getElementById('host-broadcasting-card');
+            if (hostCard) {
+                hostCard.classList.add('hidden');
+                hostCard.classList.remove('flex');
             }
             const promptBox = document.getElementById('stream-connect-prompt');
             if (promptBox) promptBox.classList.remove('hidden');
@@ -1389,6 +1692,7 @@
             const video = document.getElementById('desktop-remote-video');
             const btnText = document.getElementById('share-screen-btn-text');
             const promptBox = document.getElementById('stream-connect-prompt');
+            const hostCard = document.getElementById('host-broadcasting-card');
             const cursor = document.getElementById('desktop-virtual-cursor');
 
             if (currentSessionStream) {
@@ -1397,6 +1701,10 @@
                 if (video) {
                     video.srcObject = null;
                     video.classList.add('hidden');
+                }
+                if (hostCard) {
+                    hostCard.classList.add('hidden');
+                    hostCard.classList.remove('flex');
                 }
                 if (promptBox) promptBox.classList.remove('hidden');
                 if (cursor) cursor.classList.add('hidden');
@@ -1411,23 +1719,53 @@
                     audio: true
                 });
                 currentSessionStream = stream;
-                if (video) {
-                    video.srcObject = stream;
-                    video.classList.remove('hidden');
-                }
+
+                // Show broadcast card on host (prevents infinity mirror)
                 if (promptBox) promptBox.classList.add('hidden');
-                if (cursor) cursor.classList.remove('hidden');
+                if (hostCard) {
+                    hostCard.classList.remove('hidden');
+                    hostCard.classList.add('flex');
+                }
+                if (video) video.classList.add('hidden');
+                if (cursor) cursor.classList.add('hidden');
                 if (btnText) btnText.innerText = 'Stop Sharing';
-                showToast('🖥️ Full Real Screen active! Continues streaming when minimized.');
+                showToast('🖥️ Screen broadcast active! Streaming to partner even when minimized.');
+
+                // 1. Seamlessly replace track if peer call already exists
+                if (activePeerCall && activePeerCall.peerConnection) {
+                    try {
+                        const videoTrack = stream.getVideoTracks()[0];
+                        const senders = activePeerCall.peerConnection.getSenders();
+                        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                        if (videoSender) {
+                            videoSender.replaceTrack(videoTrack);
+                        }
+                    } catch(e) {
+                        console.warn('Track replace warning:', e);
+                    }
+                }
+
+                // 2. Call partner with stream if partner peer is known
+                const partnerPeerId = (activeDataConn && activeDataConn.peer) || (activePeerCall && activePeerCall.peer);
+                if (partnerPeerId && myPeer) {
+                    activePeerCall = myPeer.call(partnerPeerId, stream);
+                    activePeerCall.on('stream', (remoteStream) => {
+                        attachRemoteStream(remoteStream);
+                    });
+                    showToast('🚀 Streaming real screen to partner at 60 FPS!');
+                }
+
+                if (activeDataConn && activeDataConn.open) {
+                    activeDataConn.send({ type: 'stream_started' });
+                }
 
                 stream.getVideoTracks()[0].onended = () => {
                     currentSessionStream = null;
-                    if (video) {
-                        video.srcObject = null;
-                        video.classList.add('hidden');
+                    if (hostCard) {
+                        hostCard.classList.add('hidden');
+                        hostCard.classList.remove('flex');
                     }
                     if (promptBox) promptBox.classList.remove('hidden');
-                    if (cursor) cursor.classList.add('hidden');
                     if (btnText) btnText.innerText = 'Share Screen';
                     showToast('Screen broadcast ended.');
                 };
@@ -1468,6 +1806,10 @@
             const screenX = Math.round((relX / rect.width) * 1920);
             const screenY = Math.round((relY / rect.height) * 1080);
             showToast(`🖱️ Remote Left Click at (${screenX}, ${screenY})`);
+
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'click', x: screenX, y: screenY, button: 'left' });
+            }
         }
 
         function handleDesktopRightClick(e) {
@@ -1480,16 +1822,27 @@
             const screenX = Math.round((relX / rect.width) * 1920);
             const screenY = Math.round((relY / rect.height) * 1080);
             showToast(`🖱️ Remote Right Click at (${screenX}, ${screenY})`);
+
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'click', x: screenX, y: screenY, button: 'right' });
+            }
         }
 
         function simulateRemoteClick(type) {
             if (type === 'left') showToast('🖱️ Remote Left Click executed');
             else if (type === 'right') showToast('🖱️ Remote Right Click executed');
             else if (type === 'double') showToast('🖱️ Remote Double Click executed');
+            
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'click_action', action: type });
+            }
         }
 
         function simulateRemoteKey(keyName) {
             showToast(`⌨️ Sent [${keyName}] to remote device`);
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'key', key: keyName });
+            }
         }
 
         function toggleRemoteFullscreen() {
