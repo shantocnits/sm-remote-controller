@@ -10,7 +10,16 @@ import { getClipboardText } from '../../utils/deviceUtils';
 
 export const RemoteConnectCard: React.FC = () => {
   const connectToPartner = useAppStore((state) => state.connectToPartner);
+  const currentMode = useAppStore((state) => state.currentMode);
+  const devices = useAppStore((state) => state.devices);
   const [partnerId, setPartnerId] = useState('');
+
+  const modeLabel =
+    currentMode === 'm2m'
+      ? 'Mobile to Mobile'
+      : currentMode === 'm2d'
+      ? 'Mobile to Desktop'
+      : 'Desktop to Desktop';
 
   const handleConnect = () => {
     const cleanId = partnerId.replace(/[^0-9]/g, '');
@@ -18,6 +27,26 @@ export const RemoteConnectCard: React.FC = () => {
       Alert.alert('Partner ID Required', 'Please enter a valid 6-digit Partner ID to connect.');
       return;
     }
+
+    // Strict Mode Enforcement
+    const existing = devices.find((d) => d.code.replace(/\s+/g, '') === cleanId);
+    if (existing) {
+      if (currentMode === 'm2m' && existing.type === 'desktop') {
+        Alert.alert(
+          'Mode Mismatch',
+          `You have selected "Mobile to Mobile" mode, but Device ID ${existing.code} (${existing.name}) is a Desktop PC.\n\n👉 To connect and control a PC, tap the top-right menu and switch to "Mobile to Desktop" mode.`
+        );
+        return;
+      }
+      if (currentMode === 'm2d' && existing.type === 'mobile') {
+        Alert.alert(
+          'Mode Mismatch',
+          `You have selected "Mobile to Desktop" mode, but Device ID ${existing.code} (${existing.name}) is a Mobile device.\n\n👉 To connect to a Mobile phone, tap the top-right menu and switch to "Mobile to Mobile" mode.`
+        );
+        return;
+      }
+    }
+
     Keyboard.dismiss();
     connectToPartner(cleanId);
   };
@@ -33,9 +62,14 @@ export const RemoteConnectCard: React.FC = () => {
   return (
     <NeonCard style={styles.card}>
       <View style={styles.titleRow}>
-        <Text style={[Typography.bodyMedium, styles.title]}>
-          Control Remote Device
-        </Text>
+        <View style={styles.titleWithBadge}>
+          <Text style={[Typography.bodyMedium, styles.title]}>
+            Control Remote Device
+          </Text>
+          <View style={styles.modeTag}>
+            <Text style={styles.modeTagText}>{modeLabel}</Text>
+          </View>
+        </View>
         <TouchableOpacity activeOpacity={0.7} onPress={handlePasteClipboard}>
           <Text style={styles.pasteText}>Paste</Text>
         </TouchableOpacity>
@@ -80,6 +114,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  titleWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modeTag: {
+    backgroundColor: 'rgba(45, 212, 191, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+  },
+  modeTagText: {
+    color: Colors.brandGreen,
+    fontSize: 10,
+    fontWeight: '700',
   },
   title: {
     color: Colors.textSecondary,

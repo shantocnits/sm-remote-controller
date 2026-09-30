@@ -25,6 +25,7 @@ export const HomeScreen: React.FC = () => {
   const clearDevices = useAppStore((state) => state.clearDevices);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setConnectedDevice = useAppStore((state) => state.setConnectedDevice);
+  const currentMode = useAppStore((state) => state.currentMode);
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -35,6 +36,21 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleConnect = (device: Device) => {
+    // Mode Enforcement
+    if (currentMode === 'm2m' && device.type === 'desktop') {
+      Alert.alert(
+        'Mode Mismatch',
+        `You have selected "Mobile to Mobile" mode, but "${device.name}" is a Desktop PC.\n\n👉 To connect and control a PC, tap the top-right menu and choose "Mobile to Desktop" mode.`
+      );
+      return;
+    }
+    if (currentMode === 'm2d' && device.type === 'mobile') {
+      Alert.alert(
+        'Mode Mismatch',
+        `You have selected "Mobile to Desktop" mode, but "${device.name}" is a Mobile device.\n\n👉 To connect to a Mobile phone, tap the top-right menu and choose "Mobile to Mobile" mode.`
+      );
+      return;
+    }
     setConnectedDevice(device);
     setActiveTab('remote');
   };

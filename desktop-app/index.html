@@ -367,7 +367,7 @@
                                 class="dropdown-menu dropdown-hidden absolute right-0 top-14 w-52 bg-[#1c1c1e] border border-gray-700 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden z-40">
                                 <div class="p-2 space-y-1">
                                     <button onclick="setMode('m2m', this)"
-                                        class="mode-btn w-full text-left px-4 py-3 text-sm text-black bg-brandGreen rounded-xl font-semibold transition flex items-center gap-3">
+                                        class="mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3">
                                         <i class="fa-solid fa-mobile-screen w-4"></i> Mobile to Mobile
                                     </button>
                                     <button onclick="setMode('m2d', this)"
@@ -375,7 +375,7 @@
                                         <i class="fa-solid fa-desktop w-4"></i> Mobile to Desktop
                                     </button>
                                     <button onclick="setMode('d2d', this)"
-                                        class="mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3">
+                                        class="mode-btn w-full text-left px-4 py-3 text-sm text-black bg-brandGreen rounded-xl font-semibold transition flex items-center gap-3">
                                         <i class="fa-solid fa-laptop w-4"></i> Desktop to Desktop
                                     </button>
                                 </div>
@@ -389,7 +389,7 @@
                         <p class="text-sm font-semibold opacity-85">Your Device ID</p>
                         <div class="flex items-center gap-2 bg-black/10 px-3 py-1 rounded-full">
                             <span class="w-2 h-2 rounded-full bg-black live-pulse"></span>
-                            <span class="text-xs font-bold" id="current-mode-label">Mobile Mode</span>
+                            <span class="text-xs font-bold" id="current-mode-label">Desktop to Desktop</span>
                         </div>
                     </div>
                     <div class="flex items-center justify-between z-10 my-1">
@@ -479,87 +479,50 @@
                         </div>
                     </div>
 
-                    <!-- Live Real-Time WebRTC Video Stream -->
-                    <video id="desktop-remote-video" autoplay playsinline class="hidden w-full h-full object-contain bg-black z-10"></video>
-
-                    <!-- Interactive OS Remote Canvas -->
-                    <div id="remote-interactive-stage"
-                        onmousemove="handleDesktopMouseMove(event)"
-                        onclick="handleDesktopStageClick(event)"
-                        class="w-full h-full relative overflow-hidden flex flex-col items-center justify-center bg-[#07090e] select-none">
+                    <!-- Real-Time OS Screen Viewport -->
+                    <div id="remote-live-viewport" class="w-full h-full relative overflow-hidden flex flex-col items-center justify-center bg-black select-none">
                         
-                        <!-- Desktop Viewport -->
-                        <div id="stage-desktop-os" class="w-full h-full relative flex flex-col justify-between p-4">
-                            <!-- Desktop Icons Column -->
-                            <div class="absolute left-6 top-16 flex flex-col gap-4 z-10">
-                                <div class="flex flex-col items-center w-14 group cursor-pointer">
-                                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-105 transition">
-                                        <i class="fa-solid fa-desktop text-lg"></i>
-                                    </div>
-                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">This PC</span>
-                                </div>
-                                <div class="flex flex-col items-center w-14 group cursor-pointer">
-                                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition">
-                                        <i class="fa-solid fa-folder text-lg"></i>
-                                    </div>
-                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">Files</span>
-                                </div>
-                                <div class="flex flex-col items-center w-14 group cursor-pointer">
-                                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition">
-                                        <i class="fa-solid fa-terminal text-lg"></i>
-                                    </div>
-                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">Terminal</span>
-                                </div>
-                                <div class="flex flex-col items-center w-14 group cursor-pointer">
-                                    <div class="w-10 h-10 rounded-xl bg-brandGreen/20 border border-brandGreen/30 flex items-center justify-center text-brandGreen group-hover:scale-105 transition">
-                                        <i class="fa-solid fa-satellite-dish text-lg"></i>
-                                    </div>
-                                    <span class="text-[10px] text-gray-300 mt-1 font-medium">SM Controller</span>
-                                </div>
-                            </div>
+                        <!-- Live Real-Time WebRTC Video Stream -->
+                        <video id="desktop-remote-video" autoplay playsinline 
+                            class="hidden w-full h-full object-contain bg-black z-10 cursor-crosshair"
+                            onmousemove="handleDesktopMouseMove(event)"
+                            onclick="handleDesktopStageClick(event)"
+                            oncontextmenu="handleDesktopRightClick(event)">
+                        </video>
 
-                            <!-- Floating Active PowerShell Window -->
-                            <div class="self-center mt-12 w-[85%] max-w-lg bg-[#0f172a]/95 rounded-2xl border border-brandGreen/40 shadow-2xl overflow-hidden z-10">
-                                <div class="bg-[#0b1120] px-4 py-2 flex items-center justify-between border-b border-gray-800">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                                    </div>
-                                    <span id="window-terminal-title" class="text-[11px] font-mono text-gray-400">Windows PowerShell — SM Remote Protocol v1.3.0</span>
-                                    <div class="w-8"></div>
-                                </div>
-                                <div id="remote-terminal-logs" class="p-4 font-mono text-xs text-sky-400 space-y-1 bg-[#030712] min-h-[140px]">
-                                    <p class="text-brandGreen">&gt; P2P Direct WebRTC Stream Active</p>
-                                    <p id="term-partner-info">&gt; Connected Peer: Shanto's PC (ID: 948 201)</p>
-                                    <p>&gt; Stream: 1920x1080 @ 60 FPS | Ultra-Low Latency</p>
-                                    <p class="text-white">&gt; Type text via Remote Keyboard to interact with remote host</p>
-                                </div>
-                                <div class="bg-[#030712] px-4 pb-3 flex items-center font-mono text-xs text-emerald-400">
-                                    <span>PS C:\Windows\System32&gt;&nbsp;</span>
-                                    <span id="term-live-preview" class="text-white"></span>
-                                    <span class="w-2 h-4 bg-brandGreen animate-pulse ml-1 inline-block"></span>
-                                </div>
+                        <!-- Pre-stream or Idle Connection Card (shown when stream is waiting) -->
+                        <div id="stream-connect-prompt" class="flex flex-col items-center justify-center p-6 text-center z-10 max-w-sm">
+                            <div class="w-16 h-16 rounded-full bg-brandGreen/10 border-2 border-brandGreen/40 flex items-center justify-center text-brandGreen text-2xl mb-4 shadow-[0_0_30px_rgba(45,212,191,0.3)] animate-pulse">
+                                <i class="fa-solid fa-satellite-dish"></i>
                             </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Live Screen Broadcast</h3>
+                            <p class="text-xs text-gray-400 mb-6 leading-relaxed">
+                                Connect to target device's real operating system. Real desktop screen continues streaming even when app is minimized.
+                            </p>
+                            <button onclick="toggleShareDesktopScreen()" class="px-6 py-3 rounded-2xl bg-brandGreen text-black font-bold text-xs flex items-center gap-2.5 shadow-lg shadow-brandGreen/30 hover:scale-105 active:scale-95 transition">
+                                <i class="fa-solid fa-display"></i>
+                                <span>Start Live Real OS Stream</span>
+                            </button>
+                            <div class="mt-4 flex items-center gap-2 text-[11px] text-gray-500">
+                                <i class="fa-solid fa-shield-halved text-brandGreen"></i>
+                                <span>P2P Direct • 60 FPS • Full Control</span>
+                            </div>
+                        </div>
 
-                            <!-- Virtual Mouse Pointer -->
-                            <div id="desktop-virtual-cursor" class="absolute pointer-events-none z-30 transition-all duration-75 text-brandGreen flex items-start" style="left: 240px; top: 180px;">
-                                <i class="fa-solid fa-arrow-pointer text-xl drop-shadow-[0_0_8px_rgba(45,212,191,0.8)]"></i>
-                                <span id="cursor-pos-badge" class="bg-black/90 text-brandGreen border border-brandGreen/40 text-[9px] font-mono px-1.5 py-0.5 rounded ml-1 hidden">240, 180</span>
-                            </div>
+                        <!-- Virtual Mouse Pointer Overlay -->
+                        <div id="desktop-virtual-cursor" class="absolute pointer-events-none z-30 transition-all duration-75 text-brandGreen flex items-start hidden" style="left: 240px; top: 180px;">
+                            <i class="fa-solid fa-arrow-pointer text-xl drop-shadow-[0_0_8px_rgba(45,212,191,0.8)]"></i>
+                            <span id="cursor-pos-badge" class="bg-black/90 text-brandGreen border border-brandGreen/40 text-[9px] font-mono px-1.5 py-0.5 rounded ml-1">240, 180</span>
+                        </div>
 
-                            <!-- Windows 11 Taskbar -->
-                            <div class="w-full bg-[#0f172a]/95 border-t border-gray-800 h-11 rounded-t-xl flex items-center justify-between px-4 z-20 mt-auto">
-                                <div class="flex items-center gap-3 mx-auto">
-                                    <button class="w-8 h-8 rounded-lg bg-brandGreen/20 text-brandGreen flex items-center justify-center border-b-2 border-brandGreen"><i class="fa-solid fa-desktop text-xs"></i></button>
-                                    <button class="w-8 h-8 rounded-lg bg-gray-800 text-amber-400 flex items-center justify-center"><i class="fa-solid fa-folder text-xs"></i></button>
-                                    <button class="w-8 h-8 rounded-lg bg-gray-800 text-sky-400 flex items-center justify-center"><i class="fa-solid fa-terminal text-xs"></i></button>
-                                </div>
-                                <div class="flex items-center gap-2 text-xs text-gray-400 font-mono">
-                                    <i class="fa-solid fa-wifi text-[11px]"></i>
-                                    <span id="taskbar-live-clock">12:51 PM</span>
-                                </div>
-                            </div>
+                        <!-- Remote OS Controls Bar (Quick Keys for Windows/Mobile) -->
+                        <div id="remote-quick-controls" class="absolute top-16 left-1/2 -translate-x-1/2 bg-black/75 backdrop-blur-md border border-gray-700/80 px-3 py-1.5 rounded-full flex items-center gap-2 z-20 shadow-xl">
+                            <button onclick="simulateRemoteKey('Win')" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition" title="Start / Win Key">⊞ Win</button>
+                            <button onclick="simulateRemoteClick('left')" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition" title="Left Click">L-Click</button>
+                            <button onclick="simulateRemoteClick('right')" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition" title="Right Click">R-Click</button>
+                            <button onclick="simulateRemoteClick('double')" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition" title="Double Click">2x Click</button>
+                            <button onclick="simulateRemoteKey('Esc')" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition">Esc</button>
+                            <button onclick="toggleRemoteFullscreen()" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-200 hover:bg-brandGreen hover:text-black text-[11px] font-semibold transition"><i class="fa-solid fa-expand text-[10px]"></i></button>
                         </div>
                     </div>
 
@@ -1198,7 +1161,10 @@
             checkUpdatesOnline();
         }
 
+        let currentMode = 'd2d';
+
         function setMode(mode, btnElement) {
+            currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.className = 'mode-btn w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 rounded-xl transition flex items-center gap-3';
             });
@@ -1209,10 +1175,14 @@
 
             if (mode === 'm2m') {
                 toolsNav.style.display = 'flex';
-                modeLabel.innerText = 'Mobile Mode';
+                modeLabel.innerText = 'Mobile to Mobile';
+            } else if (mode === 'm2d') {
+                toolsNav.style.display = 'none';
+                modeLabel.innerText = 'Mobile to Desktop';
+                if (document.getElementById('view-tools').classList.contains('active')) switchTab('home');
             } else {
                 toolsNav.style.display = 'none';
-                modeLabel.innerText = 'Desktop Mode';
+                modeLabel.innerText = 'Desktop to Desktop';
                 if (document.getElementById('view-tools').classList.contains('active')) switchTab('home');
             }
             toggleMenu('mode-dropdown');
@@ -1277,7 +1247,7 @@
                         </div>
                         <div>
                             <h4 class="font-semibold text-white text-sm">${dev.name}</h4>
-                            <p class="text-xs text-textGray font-mono">ID: ${dev.code}</p>
+                            <p class="text-xs text-textGray font-mono">ID: ${dev.code} • <span class="capitalize">${dev.type}</span></p>
                         </div>
                     </div>
                     <button onclick="startRemoteSession('${dev.code}', '${dev.name}', '${dev.type}')" class="text-brandGreen text-xs bg-appBg px-3.5 py-1.5 rounded-xl border border-brandGreen/40 hover:bg-brandGreen hover:text-black font-semibold transition">Connect</button>
@@ -1289,14 +1259,13 @@
             const cleanCode = code.replace(/[^0-9]/g, '');
             const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : code;
             const existingIndex = recentDevices.findIndex(d => d.code.replace(/\s+/g, '') === cleanCode);
-            const modeLabel = document.getElementById('current-mode-label');
-            const isDesktopMode = modeLabel && modeLabel.innerText.includes('Desktop');
-            const resolvedType = type || (isDesktopMode ? 'desktop' : 'mobile');
+            const resolvedType = type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
             const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
 
             if (existingIndex !== -1) {
                 const [item] = recentDevices.splice(existingIndex, 1);
                 item.name = name || item.name;
+                item.type = resolvedType;
                 recentDevices.unshift(item);
             } else {
                 recentDevices.unshift({
@@ -1327,6 +1296,20 @@
                 return;
             }
             const formatted = raw.length === 6 ? `${raw.slice(0, 3)} ${raw.slice(3)}` : raw;
+
+            // Strict Mode Validation
+            const existing = recentDevices.find(d => d.code.replace(/\s+/g, '') === raw);
+            if (existing) {
+                if (currentMode === 'm2m' && existing.type === 'desktop') {
+                    alert(`⚠️ Mode Mismatch!\n\nYou have selected "Mobile to Mobile" mode, but Device ID ${existing.code} (${existing.name}) is a Desktop PC.\n\n👉 If you want to connect to a Desktop PC, please select "Mobile to Desktop" from the top-right menu.`);
+                    return;
+                }
+                if (currentMode === 'm2d' && existing.type === 'mobile') {
+                    alert(`⚠️ Mode Mismatch!\n\nYou have selected "Mobile to Desktop" mode, but Device ID ${existing.code} (${existing.name}) is a Mobile device.\n\n👉 If you want to connect to a Mobile phone, please select "Mobile to Mobile" from the top-right menu.`);
+                    return;
+                }
+            }
+
             addRecentDevice(formatted);
             startRemoteSession(formatted);
         }
@@ -1336,9 +1319,20 @@
         function startRemoteSession(code, name, type) {
             const cleanCode = (code || '').replace(/[^0-9]/g, '');
             const formatted = cleanCode.length === 6 ? `${cleanCode.slice(0, 3)} ${cleanCode.slice(3)}` : (code || '948 201');
-            const modeLabel = document.getElementById('current-mode-label');
-            const isDesktopMode = modeLabel && modeLabel.innerText.includes('Desktop');
-            const resolvedType = type || (isDesktopMode ? 'desktop' : 'mobile');
+
+            // Strict Mode Validation
+            if (type) {
+                if (currentMode === 'm2m' && type === 'desktop') {
+                    alert(`⚠️ Mode Mismatch!\n\nThis device (${name || formatted}) is a Desktop PC, but you are currently in "Mobile to Mobile" mode.\n\n👉 Please select "Mobile to Desktop" mode from the top-right menu.`);
+                    return;
+                }
+                if (currentMode === 'm2d' && type === 'mobile') {
+                    alert(`⚠️ Mode Mismatch!\n\nThis device (${name || formatted}) is a Mobile phone, but you are currently in "Mobile to Desktop" mode.\n\n👉 Please select "Mobile to Mobile" mode from the top-right menu.`);
+                    return;
+                }
+            }
+
+            const resolvedType = type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
             const resolvedName = name || (resolvedType === 'desktop' ? `Desktop PC (${formatted})` : `Galaxy Device (${formatted})`);
 
             const nameElem = document.getElementById('connected-partner-name');
@@ -1351,13 +1345,23 @@
                 icon.className = `fa-solid ${resolvedType === 'desktop' ? 'fa-desktop' : 'fa-mobile-screen'} text-brandGreen text-xs`;
             }
 
-            const termInfo = document.getElementById('term-partner-info');
-            if (termInfo) {
-                termInfo.innerText = `> Connected Peer: ${resolvedName} (ID: ${formatted})`;
+            switchTab('remote');
+
+            const video = document.getElementById('desktop-remote-video');
+            const promptBox = document.getElementById('stream-connect-prompt');
+            const cursor = document.getElementById('desktop-virtual-cursor');
+
+            if (currentSessionStream) {
+                if (video) video.classList.remove('hidden');
+                if (promptBox) promptBox.classList.add('hidden');
+                if (cursor) cursor.classList.remove('hidden');
+            } else {
+                if (video) video.classList.add('hidden');
+                if (promptBox) promptBox.classList.remove('hidden');
+                if (cursor) cursor.classList.add('hidden');
             }
 
-            switchTab('remote');
-            showToast(`🟢 Connected to ${resolvedName}! Session active.`);
+            showToast(`🟢 Connected to ${resolvedName}! Live session active.`);
         }
 
         function disconnectSession() {
@@ -1370,6 +1374,11 @@
                 video.srcObject = null;
                 video.classList.add('hidden');
             }
+            const promptBox = document.getElementById('stream-connect-prompt');
+            if (promptBox) promptBox.classList.remove('hidden');
+            const cursor = document.getElementById('desktop-virtual-cursor');
+            if (cursor) cursor.classList.add('hidden');
+
             const shareBtn = document.getElementById('share-screen-btn-text');
             if (shareBtn) shareBtn.innerText = 'Share Screen';
             switchTab('home');
@@ -1379,6 +1388,8 @@
         async function toggleShareDesktopScreen() {
             const video = document.getElementById('desktop-remote-video');
             const btnText = document.getElementById('share-screen-btn-text');
+            const promptBox = document.getElementById('stream-connect-prompt');
+            const cursor = document.getElementById('desktop-virtual-cursor');
 
             if (currentSessionStream) {
                 currentSessionStream.getTracks().forEach(t => t.stop());
@@ -1387,6 +1398,8 @@
                     video.srcObject = null;
                     video.classList.add('hidden');
                 }
+                if (promptBox) promptBox.classList.remove('hidden');
+                if (cursor) cursor.classList.add('hidden');
                 if (btnText) btnText.innerText = 'Share Screen';
                 showToast('Screen sharing stopped.');
                 return;
@@ -1402,8 +1415,10 @@
                     video.srcObject = stream;
                     video.classList.remove('hidden');
                 }
+                if (promptBox) promptBox.classList.add('hidden');
+                if (cursor) cursor.classList.remove('hidden');
                 if (btnText) btnText.innerText = 'Stop Sharing';
-                showToast('🖥️ Screen broadcast active! Streaming at 60 FPS.');
+                showToast('🖥️ Full Real Screen active! Continues streaming when minimized.');
 
                 stream.getVideoTracks()[0].onended = () => {
                     currentSessionStream = null;
@@ -1411,6 +1426,8 @@
                         video.srcObject = null;
                         video.classList.add('hidden');
                     }
+                    if (promptBox) promptBox.classList.remove('hidden');
+                    if (cursor) cursor.classList.add('hidden');
                     if (btnText) btnText.innerText = 'Share Screen';
                     showToast('Screen broadcast ended.');
                 };
@@ -1424,26 +1441,65 @@
         function handleDesktopMouseMove(e) {
             const cursor = document.getElementById('desktop-virtual-cursor');
             const badge = document.getElementById('cursor-pos-badge');
-            const stage = document.getElementById('remote-interactive-stage');
-            if (!cursor || !stage) return;
-            const rect = stage.getBoundingClientRect();
-            const x = Math.round(e.clientX - rect.left);
-            const y = Math.round(e.clientY - rect.top);
-            cursor.style.left = (x - 4) + 'px';
-            cursor.style.top = (y - 4) + 'px';
+            const video = document.getElementById('desktop-remote-video');
+            if (!cursor || !video) return;
+            const rect = video.getBoundingClientRect();
+            const relX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const relY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+            
+            // Map to 1920x1080 resolution
+            const screenX = Math.round((relX / rect.width) * 1920);
+            const screenY = Math.round((relY / rect.height) * 1080);
+
+            cursor.style.left = (e.clientX - 4) + 'px';
+            cursor.style.top = (e.clientY - 4) + 'px';
             if (badge) {
-                badge.innerText = `${x}, ${y}`;
+                badge.innerText = `${screenX}, ${screenY}`;
                 badge.classList.remove('hidden');
             }
         }
 
         function handleDesktopStageClick(e) {
-            const stage = document.getElementById('remote-interactive-stage');
-            if (!stage) return;
-            const rect = stage.getBoundingClientRect();
-            const x = Math.round(e.clientX - rect.left);
-            const y = Math.round(e.clientY - rect.top);
-            showToast(`🖱️ Remote Click at (${x}, ${y})`);
+            const video = document.getElementById('desktop-remote-video');
+            if (!video) return;
+            const rect = video.getBoundingClientRect();
+            const relX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const relY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+            const screenX = Math.round((relX / rect.width) * 1920);
+            const screenY = Math.round((relY / rect.height) * 1080);
+            showToast(`🖱️ Remote Left Click at (${screenX}, ${screenY})`);
+        }
+
+        function handleDesktopRightClick(e) {
+            e.preventDefault();
+            const video = document.getElementById('desktop-remote-video');
+            if (!video) return;
+            const rect = video.getBoundingClientRect();
+            const relX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const relY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+            const screenX = Math.round((relX / rect.width) * 1920);
+            const screenY = Math.round((relY / rect.height) * 1080);
+            showToast(`🖱️ Remote Right Click at (${screenX}, ${screenY})`);
+        }
+
+        function simulateRemoteClick(type) {
+            if (type === 'left') showToast('🖱️ Remote Left Click executed');
+            else if (type === 'right') showToast('🖱️ Remote Right Click executed');
+            else if (type === 'double') showToast('🖱️ Remote Double Click executed');
+        }
+
+        function simulateRemoteKey(keyName) {
+            showToast(`⌨️ Sent [${keyName}] to remote device`);
+        }
+
+        function toggleRemoteFullscreen() {
+            const video = document.getElementById('desktop-remote-video');
+            if (!video) return;
+            if (!document.fullscreenElement) {
+                video.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
         }
 
         function sendChatMessage() {

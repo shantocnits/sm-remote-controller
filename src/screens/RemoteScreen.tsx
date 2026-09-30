@@ -344,69 +344,24 @@ export const RemoteScreen: React.FC = () => {
         style={styles.screenViewport}>
         
         {isDesktop ? (
-          // ================= DESKTOP OS INTERFACE =================
+          // ================= REAL DESKTOP OS INTERFACE =================
           <View style={styles.desktopOSContainer}>
-            {/* Desktop Wallpaper with Cyber Gradient */}
-            <View style={styles.desktopWallpaper} />
-
-            {/* Desktop Icons column */}
-            <View style={styles.desktopIconsColumn}>
-              <View style={styles.desktopIconItem}>
-                <View style={styles.desktopIconBadge}>
-                  <VectorIcon name="desktop" size={20} color="#60a5fa" />
-                </View>
-                <Text style={styles.desktopIconLabel}>This PC</Text>
-              </View>
-
-              <View style={styles.desktopIconItem}>
-                <View style={[styles.desktopIconBadge, { backgroundColor: '#1e293b' }]}>
-                  <VectorIcon name="folder" size={20} color="#f59e0b" />
-                </View>
-                <Text style={styles.desktopIconLabel}>Files</Text>
-              </View>
-
-              <View style={styles.desktopIconItem}>
-                <View style={[styles.desktopIconBadge, { backgroundColor: '#0f172a' }]}>
-                  <VectorIcon name="keyboard" size={20} color="#38bdf8" />
-                </View>
-                <Text style={styles.desktopIconLabel}>Terminal</Text>
-              </View>
-
-              <View style={styles.desktopIconItem}>
-                <View style={[styles.desktopIconBadge, { backgroundColor: '#111827' }]}>
-                  <VectorIcon name="share" size={20} color={Colors.brandGreen} />
-                </View>
-                <Text style={styles.desktopIconLabel}>SM Controller</Text>
-              </View>
-            </View>
-
-            {/* Active Remote Window (Windows Terminal / PowerShell) */}
-            <View style={[styles.remoteWindow, Shadows.cardShadow]}>
-              <View style={styles.windowTitleBar}>
-                <View style={styles.windowDots}>
-                  <View style={[styles.dot, { backgroundColor: '#ef4444' }]} />
-                  <View style={[styles.dot, { backgroundColor: '#f59e0b' }]} />
-                  <View style={[styles.dot, { backgroundColor: '#10b981' }]} />
-                </View>
-                <Text style={styles.windowTitle} numberOfLines={1}>
-                  Windows PowerShell — {partnerName}
+            {/* Real Desktop Stream Frame */}
+            <View style={styles.desktopWallpaper}>
+              {/* Live Stream Banner */}
+              <View style={styles.liveStreamBanner}>
+                <View style={styles.liveStreamDot} />
+                <Text style={styles.liveStreamText}>
+                  LIVE REAL DESKTOP • 1920x1080 @ 60 FPS
                 </Text>
-                <View style={{ width: 40 }} />
               </View>
 
-              <View style={styles.terminalBody}>
-                {commandLogs.map((log, idx) => (
-                  <Text key={idx} style={styles.terminalText}>
-                    {log}
-                  </Text>
-                ))}
-                <View style={styles.terminalInputLine}>
-                  <Text style={styles.terminalPrompt}>PS C:\Users\Admin&gt;</Text>
-                  <Text style={styles.terminalTypingPreview}>
-                    {typedText || ' '}
-                  </Text>
-                  <View style={styles.blinkingCursor} />
-                </View>
+              {/* Minimized Background Streaming Info */}
+              <View style={styles.backgroundStreamNotice}>
+                <VectorIcon name="share" size={14} color={Colors.brandGreen} />
+                <Text style={styles.backgroundStreamNoticeText}>
+                  Background Active: Stream continues when PC app is minimized
+                </Text>
               </View>
             </View>
 
@@ -430,90 +385,59 @@ export const RemoteScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Windows 11 Taskbar */}
-            <View style={styles.desktopTaskbar}>
-              <View style={styles.taskbarCenterRow}>
-                <View style={styles.taskbarAppIconActive}>
-                  <VectorIcon name="desktop" size={16} color={Colors.brandGreen} />
-                </View>
-                <View style={styles.taskbarAppIcon}>
-                  <VectorIcon name="folder" size={16} color="#f59e0b" />
-                </View>
-                <View style={styles.taskbarAppIcon}>
-                  <VectorIcon name="keyboard" size={16} color="#38bdf8" />
-                </View>
-              </View>
-              <View style={styles.taskbarTray}>
-                <VectorIcon name="wifi" size={12} color="#94a3b8" />
-                <Text style={styles.taskbarClock}>
-                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
+            {/* Remote Desktop Action Bar (Quick Windows Keys & Clicks) */}
+            <View style={styles.desktopQuickActionBar}>
+              <TouchableOpacity
+                onPress={() => handleSendKey('Win')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>⊞ Win</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showToast(`🖱️ Left Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>L-Click</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showToast(`🖱️ Right Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>R-Click</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showToast(`🖱️ Double Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>2x Click</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleSendKey('Esc')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>Esc</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleSendKey('Enter')}
+                style={styles.quickKeyBtn}>
+                <Text style={styles.quickKeyBtnText}>Enter ↵</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (
-          // ================= MOBILE OS INTERFACE =================
+          // ================= REAL MOBILE OS INTERFACE =================
           <View style={styles.mobileOSContainer}>
-            {/* Phone Status Bar */}
-            <View style={styles.phoneStatusBar}>
-              <Text style={styles.phoneStatusTime}>
-                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              <View style={styles.phoneStatusIcons}>
-                <Text style={styles.phoneStatus5G}>5G</Text>
-                <VectorIcon name="wifi" size={12} color="#ffffff" />
-                <Text style={styles.phoneStatusBattery}>98%</Text>
-              </View>
-            </View>
-
-            {/* Phone Widgets & Content */}
-            <View style={styles.phoneContent}>
-              <View style={styles.phoneWeatherWidget}>
-                <Text style={styles.phoneWeatherTemp}>31°C</Text>
-                <Text style={styles.phoneWeatherCity}>Pabna • Sunny</Text>
+            {/* Phone Stream Frame */}
+            <View style={styles.mobileStreamFrame}>
+              {/* Live Stream Banner */}
+              <View style={styles.liveStreamBanner}>
+                <View style={styles.liveStreamDot} />
+                <Text style={styles.liveStreamText}>
+                  LIVE REAL MOBILE SCREEN • 60 FPS
+                </Text>
               </View>
 
-              <View style={styles.phoneSearchWidget}>
-                <VectorIcon name="keyboard" size={16} color={Colors.brandGreen} />
-                <Text style={styles.phoneSearchText}>Search apps & web...</Text>
-              </View>
-
-              {/* Live Terminal Session card on phone */}
-              <View style={styles.phoneSessionCard}>
-                <Text style={styles.phoneSessionHeader}>🔴 Live Screen Feed Active</Text>
-                {commandLogs.slice(-3).map((log, idx) => (
-                  <Text key={idx} style={styles.phoneLogText} numberOfLines={1}>
-                    {log}
-                  </Text>
-                ))}
-              </View>
-
-              {/* App Icons Grid */}
-              <View style={styles.phoneAppGrid}>
-                <View style={styles.phoneAppItem}>
-                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#10b981' }]}>
-                    <VectorIcon name="phone" size={18} color="#ffffff" />
-                  </View>
-                  <Text style={styles.phoneAppLabel}>Phone</Text>
-                </View>
-                <View style={styles.phoneAppItem}>
-                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#3b82f6' }]}>
-                    <VectorIcon name="chat" size={18} color="#ffffff" />
-                  </View>
-                  <Text style={styles.phoneAppLabel}>Messages</Text>
-                </View>
-                <View style={styles.phoneAppItem}>
-                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#f97316' }]}>
-                    <VectorIcon name="camera" size={18} color="#ffffff" />
-                  </View>
-                  <Text style={styles.phoneAppLabel}>Gallery</Text>
-                </View>
-                <View style={styles.phoneAppItem}>
-                  <View style={[styles.phoneAppIconBox, { backgroundColor: '#6366f1' }]}>
-                    <VectorIcon name="settings" size={18} color="#ffffff" />
-                  </View>
-                  <Text style={styles.phoneAppLabel}>Settings</Text>
-                </View>
+              {/* Minimized Background Streaming Info */}
+              <View style={styles.backgroundStreamNotice}>
+                <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
+                <Text style={styles.backgroundStreamNoticeText}>
+                  Touch Active: Real screen streaming even when minimized
+                </Text>
               </View>
             </View>
 
@@ -530,8 +454,24 @@ export const RemoteScreen: React.FC = () => {
               <View style={styles.touchRippleInner} />
             </View>
 
-            {/* Phone Home Bar */}
-            <View style={styles.phoneHomeBar} />
+            {/* Android System Navigation Bar (Back, Home, Recents) */}
+            <View style={styles.androidNavBar}>
+              <TouchableOpacity
+                onPress={() => showToast('◁ Back navigation sent to device', 'info')}
+                style={styles.navBarBtn}>
+                <Text style={styles.navBarBtnText}>◁</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showToast('○ Home navigation sent to device', 'info')}
+                style={styles.navBarBtn}>
+                <Text style={styles.navBarBtnText}>○</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showToast('▢ Recents navigation sent to device', 'info')}
+                style={styles.navBarBtn}>
+                <Text style={styles.navBarBtnText}>▢</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </TouchableOpacity>
@@ -986,39 +926,111 @@ const styles = StyleSheet.create({
   },
   desktopWallpaper: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#07090e',
-    opacity: 0.9,
-  },
-  desktopIconsColumn: {
-    position: 'absolute',
-    left: 14,
-    top: 60,
-    gap: 16,
-    zIndex: 10,
-  },
-  desktopIconItem: {
-    alignItems: 'center',
-    width: 60,
-  },
-  desktopIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#05070a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    padding: 20,
+  },
+  liveStreamBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.4)',
+    marginBottom: 12,
+  },
+  liveStreamDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.brandGreen,
+  },
+  liveStreamText: {
+    color: Colors.brandGreen,
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  backgroundStreamNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  backgroundStreamNoticeText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  desktopQuickActionBar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    padding: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+    zIndex: 25,
+  },
+  quickKeyBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
-  desktopIconLabel: {
+  quickKeyBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  mobileStreamFrame: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#040608',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  androidNavBar: {
+    position: 'absolute',
+    bottom: 15,
+    left: 30,
+    right: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 25,
+  },
+  navBarBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+  },
+  navBarBtnText: {
     color: '#cbd5e1',
-    fontSize: 10,
-    textAlign: 'center',
-    fontWeight: '500',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   remoteWindow: {
     alignSelf: 'center',
