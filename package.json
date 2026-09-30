@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "live": "node scripts/live-test.js",
+    "live:push": "node scripts/live-install.js",
     "android": "node scripts/run-android.js",
     "ios": "react-native run-ios",
     "start": "react-native start",
