@@ -57,23 +57,28 @@ try {
 console.log('\n📱 Step 3: Copying Android APK to apk folder...');
 const debugApkSource = path.join(rootDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const releaseApkSource = path.join(rootDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
-
 const apkSource = fs.existsSync(releaseApkSource) ? releaseApkSource : debugApkSource;
+const apkTarget = path.join(apkOutputDir, 'SM_Remote_Controller.apk');
+const apkVersionTarget = path.join(apkOutputDir, `SM_Remote_Controller_v${version}.apk`);
 
 if (fs.existsSync(apkSource)) {
-  const apkTarget = path.join(apkOutputDir, 'SM_Remote_Controller.apk');
-  const apkVersionTarget = path.join(apkOutputDir, `SM_Remote_Controller_v${version}.apk`);
-  
+  fs.copyFileSync(apkSource, apkTarget);
   // Sign APK targets
   const apksignerPath = 'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\apksigner.bat';
   const debugKeystore = path.join(rootDir, 'android', 'app', 'debug.keystore');
   if (fs.existsSync(apksignerPath) && fs.existsSync(debugKeystore)) {
     try {
       execSync(`& "${apksignerPath}" sign --ks "${debugKeystore}" --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android "${apkTarget}"`, { shell: 'powershell', stdio: 'ignore' });
-      fs.copyFileSync(apkTarget, apkVersionTarget);
       console.log('🔏 Android APK cryptographically signed with v2/v3 signature schemes.');
     } catch (e) {}
   }
+}
+
+if (fs.existsSync(apkTarget)) {
+  fs.copyFileSync(apkTarget, apkVersionTarget);
+  console.log(`✅ Android APK ready in apk folder:`);
+  console.log(`   - ${apkTarget}`);
+  console.log(`   - ${apkVersionTarget}`);
 }
 
 console.log('\n🎉 [Build All Completed] All latest files are ready in the "apk/" folder!\n');

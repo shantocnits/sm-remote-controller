@@ -1,17 +1,16 @@
 {
-  "version": "1.3.0",
-  "versionCode": 4,
-  "releaseDate": "2026-09-29",
+  "version": "1.4.0",
+  "versionCode": 5,
+  "releaseDate": "2026-10-01",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.3.0/SM_Remote_Controller.apk",
-  "exeUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.3.0/SM_Remote_Controller.exe",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.4.0/SM_Remote_Controller.apk",
+  "exeUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.4.0/SM_Remote_Controller.exe",
   "changelog": [
-    "⚡ New: Multi-CDN Mirror Fallback (raw GitHub, jsDelivr CDN & GitHub API)",
-    "🛡️ New: Transparent connection & repo visibility status in Update Modal",
-    "🚀 New: Live Screen Recording with automatic MP4 export",
-    "📸 New: Camera Screenshot with flash animation",
-    "🎙️ New: Real-time Mic Mute / Unmute voice toggle",
-    "⌨️ New: Remote Virtual Keyboard & PC Shortcut Key tray",
-    "🖥️ Fix: Unified seamless update download for both Mobile & Desktop"
+    "🚀 WebRTC P2P Real-Time 60 FPS Screen Sharing (Ultra-low Latency)",
+    "📱 Automatic Real Device Name detection & display (Infinix, Windows PC, etc.)",
+    "⚡ Instant bidirectional P2P Handshake for remote touch & mouse control",
+    "🛡️ Infinity Mirror prevention with background broadcasting status overlay",
+    "🔒 Strict device validation and self-connection protection",
+    "⚡ Multi-CDN OTA update engine (GitHub Releases, jsDelivr & Raw)"
   ]
 }
