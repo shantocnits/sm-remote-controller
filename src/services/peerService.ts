@@ -173,54 +173,64 @@ class PeerService {
   }
 
   /**
-   * Process incoming signaling message with deduplication
+   * Process incoming signaling message with robust ID normalization
    */
   private handleIncomingMessage(msg: PeerMessage, rawMsgId?: string) {
     if (!msg || !msg.type || !msg.fromId) return;
 
+    const cleanFromId = (msg.fromId || '').replace(/[^0-9]/g, '');
+    const cleanSelfId = this.getSelfCleanId().replace(/[^0-9]/g, '');
+
     // Ignore self messages
-    if (msg.fromId === this.getSelfCleanId()) return;
+    if (cleanFromId === cleanSelfId) return;
 
-    // Deduplication key
-    const dedupKey = rawMsgId || `${msg.fromId}_${msg.type}_${msg.timestamp}`;
-    if (this.processedMessages.has(dedupKey)) {
-      return;
+    // Only deduplicate non-request messages to ensure repeated connect requests are always shown
+    if (msg.type !== 'CONNECT_REQUEST') {
+      const dedupKey = rawMsgId || `${cleanFromId}_${msg.type}_${msg.timestamp}`;
+      if (this.processedMessages.has(dedupKey)) {
+        return;
+      }
+      this.processedMessages.add(dedupKey);
+
+      if (this.processedMessages.size > 200) {
+        const arr = Array.from(this.processedMessages);
+        this.processedMessages = new Set(arr.slice(-100));
+      }
     }
-    this.processedMessages.add(dedupKey);
 
-    // Keep set bounded
-    if (this.processedMessages.size > 200) {
-      const arr = Array.from(this.processedMessages);
-      this.processedMessages = new Set(arr.slice(-100));
-    }
-
-    console.log('[PeerService] Incoming verified message:', msg.type, 'from:', msg.fromId, msg.fromName);
+    console.log('[PeerService] Incoming verified message:', msg.type, 'from:', cleanFromId, msg.fromName);
 
     // If caller is waiting for partner response
-    if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === msg.fromId) {
-      if (msg.type === 'CONNECT_ACCEPT') {
-        clearTimeout(this.pendingConnectPromise.timer);
-        const resolve = this.pendingConnectPromise.resolve;
-        this.pendingConnectPromise = null;
-        resolve({
-          success: true,
-          partnerName: msg.fromName || `Mobile (${msg.fromId})`,
-          partnerCode: msg.fromId,
-        });
-      } else if (msg.type === 'CONNECT_REJECT') {
-        clearTimeout(this.pendingConnectPromise.timer);
-        const resolve = this.pendingConnectPromise.resolve;
-        this.pendingConnectPromise = null;
-        resolve({
-          success: false,
-          error: msg.payload?.reason || 'Partner rejected the connection request.',
-        });
+    if (this.pendingConnectPromise) {
+      const cleanPendingTarget = (this.pendingConnectPromise.targetId || '').replace(/[^0-9]/g, '');
+      if (cleanPendingTarget === cleanFromId) {
+        if (msg.type === 'CONNECT_ACCEPT') {
+          clearTimeout(this.pendingConnectPromise.timer);
+          const resolve = this.pendingConnectPromise.resolve;
+          this.pendingConnectPromise = null;
+          resolve({
+            success: true,
+            partnerName: msg.fromName || `Mobile (${cleanFromId})`,
+            partnerCode: cleanFromId,
+          });
+        } else if (msg.type === 'CONNECT_REJECT') {
+          clearTimeout(this.pendingConnectPromise.timer);
+          const resolve = this.pendingConnectPromise.resolve;
+          this.pendingConnectPromise = null;
+          resolve({
+            success: false,
+            error: msg.payload?.reason || 'Partner rejected the connection request.',
+          });
+        }
       }
     }
 
     // Stream handler and event listeners
     screenStreamService.handlePeerMessage(msg);
-    this.emit(msg);
+    this.emit({
+      ...msg,
+      fromId: cleanFromId,
+    });
   }
 
   /**
@@ -232,16 +242,24 @@ class PeerService {
     const url = `https://ntfy.sh/${topic}`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(message),
+        body: JSON.stringify({
+          ...message,
+          fromId: this.getSelfCleanId(),
+        }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       return res.ok;
     } catch (err) {
-      console.warn('[PeerService] Failed to send message:', err);
+      console.warn('[PeerService] Failed to send message to', cleanTarget, err);
       return false;
     }
   }
@@ -291,13 +309,19 @@ class PeerService {
         timer,
       };
 
-      // Send connection request
-      this.sendToDevice(cleanTarget, {
+      // Send connection request + backup burst to guarantee delivery
+      const reqMsg: PeerMessage = {
         type: 'CONNECT_REQUEST',
         fromId: cleanSelf,
         fromName: this.selfName,
         timestamp: Date.now(),
-      });
+      };
+      this.sendToDevice(cleanTarget, reqMsg);
+      setTimeout(() => {
+        if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === cleanTarget) {
+          this.sendToDevice(cleanTarget, reqMsg);
+        }
+      }, 400);
     });
   }
 
@@ -328,7 +352,7 @@ class PeerService {
    */
   public async sendConnectAccept(targetId: string): Promise<boolean> {
     const identity = getDeviceIdentity();
-    return this.sendToDevice(targetId, {
+    const payload: PeerMessage = {
       type: 'CONNECT_ACCEPT',
       fromId: this.getSelfCleanId(),
       fromName: identity.deviceName,
@@ -341,7 +365,12 @@ class PeerService {
         status: 'LIVE_STREAMING_ACTIVE',
       },
       timestamp: Date.now(),
-    });
+    };
+    const res = await this.sendToDevice(targetId, payload);
+    setTimeout(() => {
+      this.sendToDevice(targetId, payload);
+    }, 350);
+    return res;
   }
 
   /**

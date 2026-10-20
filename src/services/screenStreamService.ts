@@ -88,7 +88,7 @@ class ScreenStreamService {
 
     console.log(`[ScreenStreamService] Started broadcasting to ${partnerCleanId}`);
 
-    // Send STREAM_STARTED signal
+    // Send STREAM_STARTED signal once
     peerService.sendToDevice(partnerCleanId, {
       type: 'HEARTBEAT',
       fromId: selfId,
@@ -104,7 +104,7 @@ class ScreenStreamService {
 
     this.notifyStats('Live Mobile Stream Active • 60 FPS');
 
-    // High performance frame ticker (generates stream sync events every 120ms)
+    // Keepalive heartbeat sent only once every 12 seconds to prevent rate-limiting
     this.broadcastTimer = setInterval(() => {
       if (!this.isBroadcasting || !this.currentPartnerId) {
         this.stopBroadcasting();
@@ -112,28 +112,19 @@ class ScreenStreamService {
       }
 
       this.frameCount++;
-      const frame: StreamFrame = {
-        frameIndex: this.frameCount,
-        timestamp: Date.now(),
-        batteryLevel: 85,
-        width: identity.width,
-        height: identity.height,
-        status: 'ACTIVE',
-        activeApp: 'SM Controller',
-      };
 
-      // Emit over P2P signaling
       peerService.sendToDevice(this.currentPartnerId, {
         type: 'HEARTBEAT',
         fromId: selfId,
         fromName: identity.deviceName,
         payload: {
-          streamEvent: 'FRAME_SYNC',
-          frame,
+          streamEvent: 'HEARTBEAT_SYNC',
+          batteryLevel: 85,
+          timestamp: Date.now(),
         },
         timestamp: Date.now(),
       });
-    }, 150);
+    }, 12000);
   }
 
   /**
