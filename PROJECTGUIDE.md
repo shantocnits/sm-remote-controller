@@ -17,13 +17,13 @@
 
 ## 1. 📁 apk ফোল্ডারে ফাইল ব্যবস্থাপনা (মাত্র ২টি ফাইল থাকবে)
 
-`apk/` ফোল্ডারে অতিরিক্ত বা আবর্জনা কোনো ফাইল (যেমন `.exe`, `.idsig` বা পুরনো ভার্সন) থাকবে না। এতে সবসময় শুধুমাত্র ২টি ফাইল থাকবে:
+`apk/` ফোল্ডারে অতিরিক্ত কোনো ফাইল থাকবে না। এতে সবসময় শুধুমাত্র ২টি ফাইল থাকবে:
 
 📍 **পাথ:** `apk/`
-- 📱 **`SM_Remote_Controller.apk`** — প্রধান ও লেটেস্ট অ্যান্ড্রয়েড APK (সরাসরি ফোনে ইনস্টল, শেয়ার বা GitHub Release-এ আপলোডের জন্য)।
-- 📱 **`SM_Remote_Controller_v1.5.2.apk`** — বর্তমান আপডেটেড ভার্সনসহ ব্যাকআপ APK।
+- 📱 **`SM_Remote_Controller.apk`** — ⭐ **প্রধান প্রোডাকশন APK (প্রতিবার GitHub Release-এ এই ফাইলটিই আপলোড করতে হবে!)**।
+- 📱 **`SM_Remote_Controller_v1.5.2.apk`** — আপনার লোকাল পিসিতে বর্তমান ভার্সনটির ব্যাকআপ কপি।
 
-> 💡 **নোট:** আপনি যখনই `npm run build:apk` বা `node scripts/build_all.js` চালাবেন, স্ক্রিপ্টটি স্বয়ংক্রিয়ভাবে পুরনো ফাইল ক্লিন করে শুধুমাত্র এই দুটি ফাইল রাখবে।
+> 💡 **নোট:** আপনি যখনই `node scripts/build_all.js` বা `npm run build:all` চালাবেন, স্ক্রিপ্টটি স্বয়ংক্রিয়ভাবে পুরনো ভার্সন ক্লিন করে শুধুমাত্র এই দুটি ফাইল রাখবে।
 
 ---
 
@@ -32,86 +32,76 @@
 প্রজেক্টের রুট ডিরেক্টরি থেকে নিচের কমান্ডটি চালালেই ফ্রেশ জাভাস্ক্রিপ্ট বান্ডেল তৈরি হয়ে APK ক্রিপ্টোগ্রাফিকালি সাইন (v2 & v3 schemes) হয়ে `apk/` ফোল্ডারে চলে যাবে:
 
 ```powershell
-node scripts/build_all.js
+npm run build:all
 ```
-*(অথবা সম্পূর্ণ গ্র্যাডল রিবিল্ডের জন্য: `npm run build:apk`)*
+*(অথবা: `node scripts/build_all.js`)*
 
-📍 **বিল্ড হওয়া APK লোকেশন:**  
+📍 **বিল্ড হওয়া প্রধান APK লোকেশন:**  
 `apk/SM_Remote_Controller.apk`
 
 ---
 
-## 3. GitHub-এ নতুন রিলিজ ও আপডেট পাবলিশ করার সহজ ধাপ
+## 3. 🎯 GitHub-এ নতুন রিলিজ ও আপডেট পাবলিশ করার গোল্ডেন রুলস
 
-যখন আপনি নতুন কোনো ফিচার যুক্ত করবেন বা নতুন ভার্সন দিতে চাইবেন (যেমন `1.5.1` থেকে `1.5.2`):
+> ⚠️ **গোল্ডেন রুল ১: ভার্সন নাম্বার সব সময় বাড়াতে হবে (কখনই আগের বা একই ভার্সন রাখা যাবে না!)**  
+> আগের ভার্সন যদি হয় `1.5.2`, তবে পরবর্তী ভার্সন অবশ্যই `1.5.3` করতে হবে এবং `versionCode` ৮ থেকে বাড়িয়ে ৯ করতে হবে। একই ভার্সন রাখলে অ্যাপ ভাববে সে অলরেডি আপ-টু-ডেট আছে, তাই আপডেট নোটিফিকেশন আসবে না!
+>
+> ⚠️ **গোল্ডেন রুল ২: GitHub Release-এ সবসময় `SM_Remote_Controller.apk` ফাইলটি আপলোড করতে হবে!**  
+> ভার্সন নাম্বার ওয়ালা ফাইলটি (`SM_Remote_Controller_v1.5.2.apk`) শুধুই আপনার পিসির ব্যাকআপ। অ্যাপের ভেতর যখন ব্যবহারকারী "Update Now" চাপবে, অ্যাপটি GitHub থেকে নির্দিষ্ট নাম `SM_Remote_Controller.apk` ডাউনলোড করতে যায়। তাই GitHub-এ সবসময় ফিক্সড নামের `SM_Remote_Controller.apk` ফাইলটিই আপলোড করবেন।
 
-### ধাপ ১: `version.json` ফাইল আপডেট
-[version.json](file:///d:/Panel/My-app/sm-remote-controller/version.json) ফাইলে ভার্সন নাম্বার ও চেঞ্জলগ সেট করুন:
+### ধাপ ১: `version.json` ও `build.gradle` ফাইল আপডেট
+[version.json](file:///d:/Panel/My-app/sm-remote-controller/version.json) ফাইলে ভার্সন নাম্বার ১ ধাপ বাড়িয়ে ও চেঞ্জলগ সেট করুন:
 ```json
 {
-  "version": "1.5.2",
-  "versionCode": 8,
+  "version": "1.5.3",
+  "versionCode": 9,
   "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.2/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.3/SM_Remote_Controller.apk",
   "changelog": [
-    "⚡ Dynamic real-time Device ID connection across any mobile phone",
-    "🔄 Real-time bidirectional touch, keyboard, and navigation sync",
-    "🗑️ Dynamic Recent Devices persistence (removed dummy devices, deletions stay deleted)",
-    "🆔 Deterministic stable 6-digit Device ID per physical device",
-    "📱 Real mobile model name detection & incoming connection alerts"
+    "⚡ AnyDesk-style incoming connection request & accept/decline popup",
+    "🔄 Dual-channel real-time signaling (WebSocket + HTTP fast poll)",
+    "🗑️ Dynamic Recent Devices persistence (deletions stay deleted)"
   ]
 }
 ```
-  ]
-}
+এবং [android/app/build.gradle](file:///d:/Panel/My-app/sm-remote-controller/android/app/build.gradle)-এ:
+```groovy
+versionCode 9
+versionName "1.5.3"
 ```
 
-### ধাপ ২: APK বিল্ড করা
+### ধাপ ২: ফ্রেশ APK বিল্ড করা
 ```powershell
-node scripts/build_all.js
+npm run build:all
 ```
+*(এই কমান্ডটি স্বয়ংক্রিয়ভাবে `SM_Remote_Controller.apk` তৈরি করবে এবং `SM_Remote_Controller_v1.5.3.apk` ব্যাকআপ রেখে পুরনোটি মুছে দেবে)*
 
-### ধাপ ৩: গিট পুশ করা
+### ধাপ ৩: গিট কমিট ও পুশ করা
 ```powershell
 git add .
-git commit -m "release: bump version to v1.5.0"
+git commit -m "release: bump version to v1.5.3"
 git push origin main
 ```
 
-### ধাপ ৪: GitHub Release তৈরি ও APK আপলোড
-1. আপনার GitHub রিপোজিটরির **Releases** সেকশনে যান:  
+### ধাপ ৪: GitHub Release তৈরি ও APK আপলোড (খুব সহজ)
+1. GitHub রিপোজিটরির **Releases** পেইজে যান:  
    👉 `https://github.com/shantocnits/sm-remote-controller/releases`
-2. **Draft a new release** বাটনে ক্লিক করুন।
-3. **Choose a tag / Tag version:** দিন `v1.5.0` *(version.json এ যে ভার্সন দিয়েছেন তার আগে ছোট হাতের 'v' যেমন: `v1.5.0`)*
-4. **Release title:** দিন `SM Remote Controller v1.5.0`
-5. `apk/` ফোল্ডার থেকে শুধুমাত্র **`SM_Remote_Controller.apk`** ফাইলটি ড্র্যাগ অ্যান্ড ড্রপ করে আপলোড করুন।
-6. **Publish release** বাটনে ক্লিক করুন।
+2. **"Draft a new release"** বাটনে ক্লিক করুন।
+3. **Choose a tag:** লিখুন `v1.5.3` (এবং Create new tag সিলেক্ট করুন)।
+4. **Release title:** দিন `SM Remote Controller v1.5.3`
+5. **Attach binaries:** আপনার প্রজেক্টের `apk/` ফোল্ডার থেকে শুধুমাত্র **`SM_Remote_Controller.apk`** ফাইলটি ড্র্যাগ অ্যান্ড ড্রপ করে আপলোড করুন।
+6. **"Publish release"** বাটনে ক্লিক করুন।
 
 ---
 
-## 4. ইন-অ্যাপ অটো-আপডেট ও রেড ডট কীভাবে কাজ করে
+## 4. 📲 অ্যাপ ইনস্টল ও আপডেট নেওয়ার নিয়ম: আগের অ্যাপ কি আনইনস্টল করতে হবে?
 
-1. **স্বয়ংক্রিয় আপডেট চেক:** ইউজার যখনই অ্যাপে ঢোকে, অ্যাপটি ব্যাকগ্রাউন্ডে গিটহাবের Multi-CDN মিরর (`raw.githubusercontent.com`, `jsdelivr.net`, `GitHub Releases API`) থেকে `version.json` চেক করে।
-2. **রেড ডট ডিসপ্লে:** শুধুমাত্র গিটহাবে সত্যিকারের নতুন ভার্সন থাকলেই টপ-রাইটের আপডেট বাটনে **লাল ডট (Red Dot)** জ্বলবে। যদি ব্যবহারকারীর অ্যাপ লেটেস্ট থাকে, তবে কোনো লাল ডট দেখাবে না।
-3. **এক ক্লিকে আপডেট:** ইউজার আপডেট বাটনে চাপ দিয়ে **"Update Now"** বাটনে ট্যাপ করলে সাথে সাথে লেটেস্ট APK ডাউনলোড শুরু হবে।
-4. **কনভার্ট হওয়া:** আপডেট ডাউনলোড হয়ে ইনস্টল হওয়ার পর অ্যাপের ভার্সন স্বয়ংক্রিয়ভাবে নতুন ভার্সনে কনভার্ট হয়ে যাবে এবং **রেড ডট সাথে সাথে বন্ধ হয়ে যাবে**। অ্যাপ থেকে বের হয়ে ঢুকলেও আর বারবার আপডেট চাইবে না, যতক্ষণ না ভবিষ্যতে আপনি আরেকটি নতুন ভার্সন রিলিজ করবেন।
-
----
-
-## 5. 🚨 সবচেয়ে গুরুত্বপূর্ণ: রিপোজিটরি Public রাখা
-
-> ⚠️ **রিপোজিটরি অবশ্যই Public হতে হবে:**  
-> GitHub রিপোজিটরি Private থাকলে বাইরের ডিভাইস লগইন ছাড়া `version.json` ও রিলিজ ফাইল ডাউনলোড করতে পারে না।
-> রিপোজিটরি Public আছে কিনা চেক করতে:
-> GitHub Settings -> Danger Zone -> Visibility Public নিশ্চিত করুন।
-
----
-
-## 6. জরুরি টিপস ও ট্রাবলশুটিং
-
-> 💡 **আগের অ্যাপ আনইনস্টল করার প্রয়োজন নেই:**  
-> নতুন APK সরাসরি ইনস্টল দিলে ফোনের আগের ডেটা না হারিয়ে সরাসরি অ্যাপ আপডেট হয়ে যায়।
+> 💡 **না, আগের অ্যাপ আনইনস্টল করার কোনো প্রয়োজন নেই!**  
+> যেহেতু প্রজেক্টের সাইনিং কি (KeyStore) এবং প্যাকেজ নেইম (`com.helloworld`) একই রয়েছে, তাই:
+> 1. আপনার ফোনে আগের অ্যাপ থাকা অবস্থাতেই নতুন APK ডাউনলোড করে ইনস্টল দিলে ফোনের আগের ডেটা না হারিয়ে সরাসরি **"Update"** হয়ে যাবে।
+> 2. অথবা অ্যাপের ভেতরের লাল ডট / আপডেট বাটনে চাপ দিয়ে **"Update Now"** দিলে APK ডাউনলোড হবে। ডাউনলোড শেষে নোটিফিকেশন বার থেকে ট্যাপ করে **"Update"** দিলেই নতুন ভার্সনে কনভার্ট হয়ে যাবে।
+> 3. আপডেট সম্পন্ন হলে অ্যাপে আর **রেড ডট দেখাবে না**, যতক্ষণ না ভবিষ্যতে আপনি আরেকটি নতুন ভার্সন রিলিজ করবেন।
 
 > 💡 **মোবাইল টু মোবাইল টাচ রেসপন্স:**  
 > স্ক্রিনের যেকোনো জায়গায় টাচ করলে সরাসরি লাইভ কোঅর্ডিনেট সহ টাচ রিপল ইফেক্ট দেখা যাবে এবং রিমোট ফোনে ইনপুট চলে যাবে।
