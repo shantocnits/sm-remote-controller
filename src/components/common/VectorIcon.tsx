@@ -44,6 +44,7 @@ export type IconName =
   | 'check'
   | 'download'
   | 'alert'
+  | 'shield'
   | 'wifi-off';
 
 interface VectorIconProps {
@@ -143,6 +144,8 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
         return <FontAwesome6 name="check" size={size} color={color} style={style} />;
       case 'alert':
         return <FontAwesome6 name="triangle-exclamation" size={size} color={color} style={style} />;
+      case 'shield':
+        return <FontAwesome6 name="shield-halved" size={size} color={color} style={style} />;
       case 'wifi-off':
         return <FontAwesome6 name="wifi" size={size} color={color} style={style} />;
       default:

@@ -266,9 +266,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={onClose}
+                onPress={() => {
+                  setHasNewUpdate(false);
+                  onClose();
+                }}
                 style={styles.laterBtn}>
-                <Text style={styles.laterBtnText}>Remind Me Later</Text>
+                <Text style={styles.laterBtnText}>Remind Me Later (Dismiss Badge)</Text>
               </TouchableOpacity>
             </View>
           ) : (

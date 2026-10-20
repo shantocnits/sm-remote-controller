@@ -17,7 +17,9 @@ interface AppStoreState {
 
   // Real-time P2P Connection States
   isConnecting: boolean;
+  connectingTargetCode: string | null;
   connectionError: string | null;
+  incomingRequest: { fromId: string; fromName: string; timestamp: number } | null;
   incomingPartner: { id: string; name: string } | null;
 
   // Devices (Real dynamic recent devices, persistent)
@@ -55,7 +57,11 @@ interface AppStoreState {
   loadSavedDevices: () => Promise<void>;
   addDevice: (code: string, customName?: string, type?: 'mobile' | 'desktop') => Device;
   connectToPartner: (code: string) => Promise<boolean>;
+  cancelConnectRequest: () => void;
   setConnectedDevice: (device: Device | null) => void;
+  setIncomingRequest: (req: { fromId: string; fromName: string; timestamp: number } | null) => void;
+  acceptIncomingRequest: () => Promise<void>;
+  rejectIncomingRequest: () => Promise<void>;
   setIncomingPartner: (partner: { id: string; name: string } | null) => void;
   togglePinDevice: (id: string) => void;
   setDeviceNickname: (id: string, nickname: string) => void;
@@ -99,7 +105,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   // Connection states
   isConnecting: false,
+  connectingTargetCode: null,
   connectionError: null,
+  incomingRequest: null,
   incomingPartner: null,
 
   // Devices: Starts empty, purely dynamic and cloud-persisted
@@ -141,6 +149,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
   setConnectedDevice: (device: Device | null) => set({ connectedDevice: device }),
+  setIncomingRequest: (req) => set({ incomingRequest: req }),
   setIncomingPartner: (partner) => set({ incomingPartner: partner }),
 
   // Load saved devices from cloud cache on startup
@@ -201,6 +210,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     return targetDevice;
   },
 
+  // 1. Caller: Request connection to partner
   connectToPartner: async (code: string) => {
     const cleanDigits = code.replace(/[^0-9]/g, '');
     const selfId = getCleanDeviceId();
@@ -218,7 +228,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return false;
     }
 
-    set({ isConnecting: true, connectionError: null });
+    const formatted =
+      cleanDigits.length === 6
+        ? `${cleanDigits.slice(0, 3)} ${cleanDigits.slice(3)}`
+        : cleanDigits;
+
+    set({
+      isConnecting: true,
+      connectingTargetCode: formatted,
+      connectionError: null,
+    });
 
     const result = await peerService.requestConnect(cleanDigits);
 
@@ -227,19 +246,62 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       screenStreamService.startReceiving(cleanDigits);
       set({
         isConnecting: false,
+        connectingTargetCode: null,
         connectedDevice: partnerDevice,
         activeTab: 'remote',
         partnerIdInput: '',
       });
       return true;
     } else {
-      const errMsg =
-        result.error ||
-        `Device ${code} is offline or not reachable. Make sure the app is opened on the partner's phone.`;
-      set({ isConnecting: false, connectionError: errMsg });
-      Alert.alert('Connection Failed', errMsg);
+      const errMsg = result.error || 'Connection request failed or timed out.';
+      set({
+        isConnecting: false,
+        connectingTargetCode: null,
+        connectionError: errMsg,
+      });
+      if (result.error && result.error !== 'Connection request cancelled.') {
+        Alert.alert('Connection Notice', errMsg);
+      }
       return false;
     }
+  },
+
+  // 2. Caller: Cancel pending connection request
+  cancelConnectRequest: () => {
+    const target = get().connectingTargetCode;
+    if (target) {
+      peerService.cancelConnect(target);
+    }
+    set({
+      isConnecting: false,
+      connectingTargetCode: null,
+      connectionError: null,
+    });
+  },
+
+  // 3. Callee: Accept incoming connection request
+  acceptIncomingRequest: async () => {
+    const req = get().incomingRequest;
+    if (!req) return;
+
+    await peerService.sendConnectAccept(req.fromId);
+    screenStreamService.startBroadcasting(req.fromId);
+
+    set({
+      incomingPartner: { id: req.fromId, name: req.fromName },
+      incomingRequest: null,
+    });
+  },
+
+  // 4. Callee: Reject incoming connection request
+  rejectIncomingRequest: async () => {
+    const req = get().incomingRequest;
+    if (!req) return;
+
+    await peerService.sendConnectReject(req.fromId, 'Connection declined by partner.');
+    set({
+      incomingRequest: null,
+    });
   },
 
   disconnectSession: () => {

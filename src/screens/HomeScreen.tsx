@@ -15,6 +15,8 @@ import { DeviceIdCard } from '../components/home/DeviceIdCard';
 import { RemoteConnectCard } from '../components/home/RemoteConnectCard';
 import { DeviceCard } from '../components/home/DeviceCard';
 import { DeviceActionModal } from '../components/home/DeviceActionModal';
+import { ConnectingModal } from '../components/home/ConnectingModal';
+import { IncomingRequestModal } from '../components/home/IncomingRequestModal';
 import { useAppStore } from '../store/useAppStore';
 import { Device } from '../types';
 import { peerService, PeerMessage } from '../services/peerService';
@@ -28,6 +30,7 @@ export const HomeScreen: React.FC = () => {
   const loadSavedDevices = useAppStore((state) => state.loadSavedDevices);
   const incomingPartner = useAppStore((state) => state.incomingPartner);
   const setIncomingPartner = useAppStore((state) => state.setIncomingPartner);
+  const setIncomingRequest = useAppStore((state) => state.setIncomingRequest);
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -40,13 +43,23 @@ export const HomeScreen: React.FC = () => {
     const unsubscribe = peerService.addListener((msg: PeerMessage) => {
       if (msg.type === 'CONNECT_REQUEST') {
         const partnerName = msg.fromName || `Mobile (${msg.fromId})`;
-        setIncomingPartner({ id: msg.fromId, name: partnerName });
-        screenStreamService.startBroadcasting(msg.fromId);
-        Alert.alert(
-          '📱 Incoming Remote Connection',
-          `${partnerName} (ID: ${msg.fromId}) is connected and viewing your screen.`,
-          [{ text: 'OK', style: 'default' }]
-        );
+        setIncomingRequest({
+          fromId: msg.fromId,
+          fromName: partnerName,
+          timestamp: msg.timestamp || Date.now(),
+        });
+      } else if (msg.type === 'CONNECT_CANCEL') {
+        const currentReq = useAppStore.getState().incomingRequest;
+        if (currentReq && currentReq.fromId === msg.fromId) {
+          setIncomingRequest(null);
+        }
+      } else if (msg.type === 'DISCONNECT') {
+        const currentPartner = useAppStore.getState().incomingPartner;
+        if (currentPartner && currentPartner.id === msg.fromId) {
+          screenStreamService.stopBroadcasting();
+          setIncomingPartner(null);
+          Alert.alert('Session Ended', `${msg.fromName || 'Partner'} has disconnected.`);
+        }
       }
     });
 
@@ -155,6 +168,12 @@ export const HomeScreen: React.FC = () => {
         visible={isActionModalOpen}
         onClose={() => setIsActionModalOpen(false)}
       />
+
+      {/* Caller Waiting Radar Modal */}
+      <ConnectingModal />
+
+      {/* Callee AnyDesk Style Incoming Connection Prompt */}
+      <IncomingRequestModal />
     </View>
   );
 };

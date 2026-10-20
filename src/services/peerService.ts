@@ -4,7 +4,16 @@ import { getCleanDeviceId, getDeviceId, getDeviceName, getDeviceIdentity } from 
 import { screenStreamService } from './screenStreamService';
 
 export interface PeerMessage {
-  type: 'CONNECT_REQUEST' | 'CONNECT_ACCEPT' | 'CONNECT_REJECT' | 'TOUCH' | 'KEY' | 'NAV' | 'DISCONNECT' | 'HEARTBEAT';
+  type:
+    | 'CONNECT_REQUEST'
+    | 'CONNECT_ACCEPT'
+    | 'CONNECT_REJECT'
+    | 'CONNECT_CANCEL'
+    | 'TOUCH'
+    | 'KEY'
+    | 'NAV'
+    | 'DISCONNECT'
+    | 'HEARTBEAT';
   fromId: string;
   fromName: string;
   payload?: any;
@@ -21,6 +30,8 @@ class PeerService {
   private isConnectingWs: boolean = false;
   private reconnectTimer: any = null;
   private heartbeatTimer: any = null;
+  private pollTimer: any = null;
+  private processedMessages: Set<string> = new Set();
   private pendingConnectPromise: {
     targetId: string;
     resolve: (val: { success: boolean; partnerName?: string; partnerCode?: string; error?: string }) => void;
@@ -28,7 +39,7 @@ class PeerService {
   } | null = null;
 
   /**
-   * Initialize WebSocket listener for this device
+   * Initialize dual-channel WebSocket & HTTP Polling listener for this device
    */
   public init(customSelfId?: string) {
     this.selfId = (customSelfId || getCleanDeviceId()).replace(/\s+/g, '');
@@ -36,6 +47,7 @@ class PeerService {
 
     this.connectWs();
     this.startHeartbeat();
+    this.startHttpPolling();
   }
 
   public getSelfCleanId(): string {
@@ -67,8 +79,14 @@ class PeerService {
     });
   }
 
+  /**
+   * Primary: Real-time WebSocket connection
+   */
   private connectWs() {
-    if (this.isConnectingWs || (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))) {
+    if (
+      this.isConnectingWs ||
+      (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))
+    ) {
       return;
     }
 
@@ -81,7 +99,7 @@ class PeerService {
 
       this.ws.onopen = () => {
         this.isConnectingWs = false;
-        console.log(`[PeerService] Connected to real-time channel: ${topic}`);
+        console.log(`[PeerService] WebSocket connected to: ${topic}`);
       };
 
       this.ws.onmessage = (event) => {
@@ -89,17 +107,14 @@ class PeerService {
           const raw = JSON.parse(event.data);
           if (raw.event === 'message' && raw.message) {
             const data: PeerMessage = JSON.parse(raw.message);
-            // Ignore messages sent by self
-            if (data.fromId === this.selfId) return;
-
-            this.handleIncomingMessage(data);
+            this.handleIncomingMessage(data, raw.id);
           }
         } catch (e) {
-          // non-json or ping
+          // ignore non-json
         }
       };
 
-      this.ws.onerror = (err) => {
+      this.ws.onerror = () => {
         this.isConnectingWs = false;
       };
 
@@ -118,7 +133,7 @@ class PeerService {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectWs();
-    }, 3000);
+    }, 2500);
   }
 
   private startHeartbeat() {
@@ -127,13 +142,61 @@ class PeerService {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         this.connectWs();
       }
-    }, 15000);
+    }, 12000);
   }
 
-  private async handleIncomingMessage(msg: PeerMessage) {
-    console.log('[PeerService] Received incoming message:', msg.type, 'from:', msg.fromId);
+  /**
+   * Fallback: Fast HTTP polling every 1.5s to ensure zero missed messages on mobile networks
+   */
+  private startHttpPolling() {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = setInterval(async () => {
+      const topic = `sm_remote_${this.getSelfCleanId()}`;
+      try {
+        const res = await fetch(`https://ntfy.sh/${topic}/json?since=15s&poll=1`);
+        if (!res.ok) return;
+        const text = await res.text();
+        if (!text || !text.trim()) return;
 
-    // If waiting for connect accept
+        const lines = text.trim().split('\n');
+        for (const line of lines) {
+          try {
+            const item = JSON.parse(line);
+            if (item.event === 'message' && item.message) {
+              const data: PeerMessage = JSON.parse(item.message);
+              this.handleIncomingMessage(data, item.id);
+            }
+          } catch {}
+        }
+      } catch {}
+    }, 1500);
+  }
+
+  /**
+   * Process incoming signaling message with deduplication
+   */
+  private handleIncomingMessage(msg: PeerMessage, rawMsgId?: string) {
+    if (!msg || !msg.type || !msg.fromId) return;
+
+    // Ignore self messages
+    if (msg.fromId === this.getSelfCleanId()) return;
+
+    // Deduplication key
+    const dedupKey = rawMsgId || `${msg.fromId}_${msg.type}_${msg.timestamp}`;
+    if (this.processedMessages.has(dedupKey)) {
+      return;
+    }
+    this.processedMessages.add(dedupKey);
+
+    // Keep set bounded
+    if (this.processedMessages.size > 200) {
+      const arr = Array.from(this.processedMessages);
+      this.processedMessages = new Set(arr.slice(-100));
+    }
+
+    console.log('[PeerService] Incoming verified message:', msg.type, 'from:', msg.fromId, msg.fromName);
+
+    // If caller is waiting for partner response
     if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === msg.fromId) {
       if (msg.type === 'CONNECT_ACCEPT') {
         clearTimeout(this.pendingConnectPromise.timer);
@@ -150,31 +213,12 @@ class PeerService {
         this.pendingConnectPromise = null;
         resolve({
           success: false,
-          error: 'Connection rejected by partner device.',
+          error: msg.payload?.reason || 'Partner rejected the connection request.',
         });
       }
     }
 
-    // If another device wants to connect to us:
-    if (msg.type === 'CONNECT_REQUEST') {
-      const identity = getDeviceIdentity();
-      // Auto-accept connection and send back our real device info
-      await this.sendToDevice(msg.fromId, {
-        type: 'CONNECT_ACCEPT',
-        fromId: this.getSelfCleanId(),
-        fromName: identity.deviceName,
-        payload: {
-          brand: Platform.OS === 'android' ? (Platform.constants as any)?.Brand : 'Mobile',
-          model: Platform.OS === 'android' ? (Platform.constants as any)?.Model : identity.deviceName,
-          width: identity.width,
-          height: identity.height,
-          fps: 60,
-          status: 'LIVE_STREAMING_ACTIVE',
-        },
-        timestamp: Date.now(),
-      });
-    }
-
+    // Stream handler and event listeners
     screenStreamService.handlePeerMessage(msg);
     this.emit(msg);
   }
@@ -203,7 +247,8 @@ class PeerService {
   }
 
   /**
-   * Request connection to partner device ID
+   * Request connection to partner device ID (Caller side)
+   * Does NOT auto-connect; sends request and waits for Callee to Accept
    */
   public async requestConnect(
     targetCode: string
@@ -214,30 +259,31 @@ class PeerService {
     if (cleanTarget === cleanSelf) {
       return {
         success: false,
-        error: 'Cannot connect to your own device ID. Please enter another phone’s ID.',
+        error: 'Cannot connect to your own phone ID. Please enter the other phone’s Partner ID.',
       };
     }
 
     if (cleanTarget.length < 3) {
       return {
         success: false,
-        error: 'Invalid Device ID. Partner ID must have at least 6 digits.',
+        error: 'Please enter a valid 6-digit Partner ID.',
       };
     }
 
-    // Ensure our listener is connected
+    // Ensure our channel is active
     this.connectWs();
 
     return new Promise((resolve) => {
+      // 25 second timeout for human partner to tap "Accept"
       const timer = setTimeout(() => {
         if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === cleanTarget) {
           this.pendingConnectPromise = null;
           resolve({
             success: false,
-            error: `Device ${targetCode} is offline or app is not open. Please make sure the SM Controller app is open on the other phone.`,
+            error: `Partner (ID: ${targetCode}) did not respond within 25 seconds. Please ensure SM Controller is opened on their phone.`,
           });
         }
-      }, 7000); // 7 second timeout
+      }, 25000);
 
       this.pendingConnectPromise = {
         targetId: cleanTarget,
@@ -252,6 +298,62 @@ class PeerService {
         fromName: this.selfName,
         timestamp: Date.now(),
       });
+    });
+  }
+
+  /**
+   * Cancel connection request (Caller cancels while waiting)
+   */
+  public cancelConnect(targetCode: string) {
+    const cleanTarget = targetCode.replace(/[^0-9]/g, '');
+    if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === cleanTarget) {
+      clearTimeout(this.pendingConnectPromise.timer);
+      this.pendingConnectPromise.resolve({
+        success: false,
+        error: 'Connection request cancelled.',
+      });
+      this.pendingConnectPromise = null;
+    }
+
+    this.sendToDevice(cleanTarget, {
+      type: 'CONNECT_CANCEL',
+      fromId: this.getSelfCleanId(),
+      fromName: this.selfName,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Accept incoming connection request (Callee side)
+   */
+  public async sendConnectAccept(targetId: string): Promise<boolean> {
+    const identity = getDeviceIdentity();
+    return this.sendToDevice(targetId, {
+      type: 'CONNECT_ACCEPT',
+      fromId: this.getSelfCleanId(),
+      fromName: identity.deviceName,
+      payload: {
+        brand: Platform.OS === 'android' ? (Platform.constants as any)?.Brand : 'Mobile',
+        model: Platform.OS === 'android' ? (Platform.constants as any)?.Model : identity.deviceName,
+        width: identity.width,
+        height: identity.height,
+        fps: 60,
+        status: 'LIVE_STREAMING_ACTIVE',
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Reject incoming connection request (Callee side)
+   */
+  public async sendConnectReject(targetId: string, reason = 'Connection declined by partner.'): Promise<boolean> {
+    return this.sendToDevice(targetId, {
+      type: 'CONNECT_REJECT',
+      fromId: this.getSelfCleanId(),
+      fromName: this.selfName,
+      payload: { reason },
+      timestamp: Date.now(),
     });
   }
 
