@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { Device } from '../types';
-import { getCleanDeviceId, getDeviceId, getDeviceName } from '../utils/deviceUtils';
+import { getCleanDeviceId, getDeviceId, getDeviceName, getDeviceIdentity } from '../utils/deviceUtils';
+import { screenStreamService } from './screenStreamService';
 
 export interface PeerMessage {
   type: 'CONNECT_REQUEST' | 'CONNECT_ACCEPT' | 'CONNECT_REJECT' | 'TOUCH' | 'KEY' | 'NAV' | 'DISCONNECT' | 'HEARTBEAT';
@@ -156,14 +157,17 @@ class PeerService {
 
     // If another device wants to connect to us:
     if (msg.type === 'CONNECT_REQUEST') {
-      // Auto-accept connection and send back our device info
+      const identity = getDeviceIdentity();
+      // Auto-accept connection and send back our real device info
       await this.sendToDevice(msg.fromId, {
         type: 'CONNECT_ACCEPT',
         fromId: this.getSelfCleanId(),
-        fromName: this.selfName,
+        fromName: identity.deviceName,
         payload: {
           brand: Platform.OS === 'android' ? (Platform.constants as any)?.Brand : 'Mobile',
-          model: Platform.OS === 'android' ? (Platform.constants as any)?.Model : 'Android',
+          model: Platform.OS === 'android' ? (Platform.constants as any)?.Model : identity.deviceName,
+          width: identity.width,
+          height: identity.height,
           fps: 60,
           status: 'LIVE_STREAMING_ACTIVE',
         },
@@ -171,6 +175,7 @@ class PeerService {
       });
     }
 
+    screenStreamService.handlePeerMessage(msg);
     this.emit(msg);
   }
 

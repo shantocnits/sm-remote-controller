@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { ActiveTab, AppMode, AudioCallStatus, ChatMessage, Device, VideoCallStatus } from '../types';
 import versionConfig from '../../version.json';
 import { peerService } from '../services/peerService';
+import { screenStreamService } from '../services/screenStreamService';
 import { getCleanDeviceId } from '../utils/deviceUtils';
 
 const CURRENT_VERSION = versionConfig.version || '1.5.0';
@@ -223,6 +224,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     if (result.success) {
       const partnerDevice = get().addDevice(cleanDigits, result.partnerName);
+      screenStreamService.startReceiving(cleanDigits);
       set({
         isConnecting: false,
         connectedDevice: partnerDevice,
@@ -245,6 +247,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     if (current) {
       peerService.sendDisconnect(current.code.replace(/[^0-9]/g, ''));
     }
+    screenStreamService.stopReceiving();
+    screenStreamService.stopBroadcasting();
     set({
       connectedDevice: null,
       activeTab: 'home',

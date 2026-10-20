@@ -24,6 +24,7 @@ import { LivePulseBadge } from '../components/common/LivePulseBadge';
 import { useAppStore } from '../store/useAppStore';
 
 import { peerService } from '../services/peerService';
+import { screenStreamService, StreamStats } from '../services/screenStreamService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -36,6 +37,18 @@ export const RemoteScreen: React.FC = () => {
   const partnerName = connectedDevice?.name || 'Remote Partner';
   const partnerCode = connectedDevice?.code || '--- ---';
   const partnerCleanCode = partnerCode.replace(/[^0-9]/g, '');
+
+  // Live stream quality and latency stats
+  const [streamStats, setStreamStats] = useState<StreamStats>(screenStreamService.getStats());
+
+  useEffect(() => {
+    const unsub = screenStreamService.onStats((stats) => {
+      setStreamStats(stats);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(1);
@@ -334,9 +347,11 @@ export const RemoteScreen: React.FC = () => {
         </View>
 
         <View style={styles.headerRightRow}>
-          {/* Stream quality pill */}
+          {/* Stream quality pill with live FPS and Ping */}
           <View style={styles.streamQualityPill}>
-            <Text style={styles.streamQualityText}>60 FPS • 1080p</Text>
+            <Text style={styles.streamQualityText}>
+              {streamStats.fps} FPS • {streamStats.pingMs}ms
+            </Text>
           </View>
 
           {/* Recording indicator when active */}
@@ -373,19 +388,88 @@ export const RemoteScreen: React.FC = () => {
         <View style={styles.mobileOSContainer}>
           {/* Phone Stream Frame */}
           <View style={styles.mobileStreamFrame}>
+            {/* Remote Mobile Status Bar */}
+            <View style={styles.remoteStatusBar}>
+              <Text style={styles.remoteTimeText}>
+                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              <View style={styles.remoteStatusIcons}>
+                <Text style={styles.remoteStatusIconText}>5G</Text>
+                <VectorIcon name="mobile" size={12} color={Colors.brandGreen} />
+                <Text style={styles.remoteBatteryText}>85% 🔋</Text>
+              </View>
+            </View>
+
             {/* Live Stream Banner */}
             <View style={styles.liveStreamBanner}>
               <View style={styles.liveStreamDot} />
               <Text style={styles.liveStreamText}>
-                LIVE REAL MOBILE SCREEN • 60 FPS
+                LIVE REMOTE MOBILE • {streamStats.fps} FPS • {streamStats.pingMs}ms
               </Text>
+            </View>
+
+            {/* Remote Mobile Desktop Mockup Content */}
+            <View style={styles.remoteDesktop}>
+              <View style={styles.remoteAppGrid}>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#10b981' }]}>
+                    <Text style={styles.remoteAppEmoji}>📞</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Phone</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#3b82f6' }]}>
+                    <Text style={styles.remoteAppEmoji}>💬</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Messages</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#f59e0b' }]}>
+                    <Text style={styles.remoteAppEmoji}>🌐</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Chrome</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#ec4899' }]}>
+                    <Text style={styles.remoteAppEmoji}>📷</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Camera</Text>
+                </View>
+              </View>
+
+              <View style={[styles.remoteAppGrid, { marginTop: 16 }]}>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#6366f1' }]}>
+                    <Text style={styles.remoteAppEmoji}>⚙️</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Settings</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#8b5cf6' }]}>
+                    <Text style={styles.remoteAppEmoji}>📁</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Files</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#ef4444' }]}>
+                    <Text style={styles.remoteAppEmoji}>🖼️</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Gallery</Text>
+                </View>
+                <View style={styles.remoteAppIconCol}>
+                  <View style={[styles.remoteAppIcon, { backgroundColor: '#14b8a6' }]}>
+                    <Text style={styles.remoteAppEmoji}>🎮</Text>
+                  </View>
+                  <Text style={styles.remoteAppLabel}>Games</Text>
+                </View>
+              </View>
             </View>
 
             {/* Minimized Background Streaming Info */}
             <View style={styles.backgroundStreamNotice}>
               <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
               <Text style={styles.backgroundStreamNoticeText}>
-                Touch Active: Real screen streaming & remote touch enabled
+                Touch Active: Real-time screen streaming & remote touch enabled
               </Text>
             </View>
           </View>
@@ -906,6 +990,76 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: Colors.brandGreen,
   },
+  remoteStatusBar: {
+    position: 'absolute',
+    top: 15,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  remoteTimeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  remoteStatusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  remoteStatusIconText: {
+    color: Colors.brandGreen,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  remoteBatteryText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  remoteDesktop: {
+    width: '100%',
+    paddingHorizontal: 10,
+    marginVertical: 20,
+  },
+  remoteAppGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  remoteAppIconCol: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  remoteAppIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  remoteAppEmoji: {
+    fontSize: 22,
+  },
+  remoteAppLabel: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   liveStreamText: {
     color: Colors.brandGreen,
     fontSize: 11,
@@ -928,35 +1082,6 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 10,
     fontWeight: '500',
-  },
-  desktopQuickActionBar: {
-    position: 'absolute',
-    bottom: 20,
-    left: 14,
-    right: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    padding: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.3)',
-    zIndex: 25,
-  },
-  quickKeyBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  quickKeyBtnText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
   },
   mobileStreamFrame: {
     ...StyleSheet.absoluteFillObject,

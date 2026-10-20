@@ -18,6 +18,7 @@ import { DeviceActionModal } from '../components/home/DeviceActionModal';
 import { useAppStore } from '../store/useAppStore';
 import { Device } from '../types';
 import { peerService, PeerMessage } from '../services/peerService';
+import { screenStreamService } from '../services/screenStreamService';
 
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -25,6 +26,7 @@ export const HomeScreen: React.FC = () => {
   const clearDevices = useAppStore((state) => state.clearDevices);
   const connectToPartner = useAppStore((state) => state.connectToPartner);
   const loadSavedDevices = useAppStore((state) => state.loadSavedDevices);
+  const incomingPartner = useAppStore((state) => state.incomingPartner);
   const setIncomingPartner = useAppStore((state) => state.setIncomingPartner);
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -37,10 +39,12 @@ export const HomeScreen: React.FC = () => {
 
     const unsubscribe = peerService.addListener((msg: PeerMessage) => {
       if (msg.type === 'CONNECT_REQUEST') {
-        setIncomingPartner({ id: msg.fromId, name: msg.fromName });
+        const partnerName = msg.fromName || `Mobile (${msg.fromId})`;
+        setIncomingPartner({ id: msg.fromId, name: partnerName });
+        screenStreamService.startBroadcasting(msg.fromId);
         Alert.alert(
           '📱 Incoming Remote Connection',
-          `${msg.fromName} (ID: ${msg.fromId}) is connecting to control your screen.`,
+          `${partnerName} (ID: ${msg.fromId}) is connected and viewing your screen.`,
           [{ text: 'OK', style: 'default' }]
         );
       }
@@ -76,6 +80,27 @@ export const HomeScreen: React.FC = () => {
   const renderHeader = useMemo(
     () => (
       <View style={styles.topSection}>
+        {incomingPartner && (
+          <View style={styles.broadcastingCard}>
+            <View style={styles.broadcastingHeader}>
+              <View style={styles.broadcastingDot} />
+              <Text style={styles.broadcastingTitle}>SCREEN SHARING ACTIVE</Text>
+            </View>
+            <Text style={styles.broadcastingSub}>
+              Broadcasting screen to {incomingPartner.name} (ID: {incomingPartner.id})
+            </Text>
+            <TouchableOpacity
+              style={styles.stopBroadcastBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                screenStreamService.stopBroadcasting();
+                setIncomingPartner(null);
+                Alert.alert('Session Stopped', 'Screen sharing has been stopped.');
+              }}>
+              <Text style={styles.stopBroadcastBtnText}>Stop Screen Sharing</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <DeviceIdCard />
         <RemoteConnectCard />
 
@@ -91,7 +116,7 @@ export const HomeScreen: React.FC = () => {
         </View>
       </View>
     ),
-    [hasDevices]
+    [hasDevices, incomingPartner]
   );
 
   const renderEmptyList = () => (
@@ -145,6 +170,49 @@ const styles = StyleSheet.create({
   },
   topSection: {
     marginBottom: 10,
+  },
+  broadcastingCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.dangerRed,
+    padding: 16,
+    marginBottom: 12,
+  },
+  broadcastingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  broadcastingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.dangerRed,
+  },
+  broadcastingTitle: {
+    color: Colors.dangerRed,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  broadcastingSub: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  stopBroadcastBtn: {
+    backgroundColor: Colors.dangerRed,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopBroadcastBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   recentSectionHeader: {
     flexDirection: 'row',

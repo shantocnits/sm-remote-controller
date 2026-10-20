@@ -16,7 +16,7 @@ import {
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { VectorIcon } from './VectorIcon';
-import { checkForAppUpdates, UpdateInfo } from '../../services/updateService';
+import { checkForAppUpdates, UpdateInfo, compareVersions } from '../../services/updateService';
 import { Shadows } from '../../theme/shadows';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -30,11 +30,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { appVersion, setAppVersion, setHasNewUpdate } = useAppStore();
+  const { appVersion, setHasNewUpdate } = useAppStore();
   const [loading, setLoading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isUpdated, setIsUpdated] = useState(false);
+  const [downloadStarted, setDownloadStarted] = useState(false);
 
   // Spin animation for the modal checking icon
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -43,14 +42,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     hasUpdate: false,
     currentVersion: appVersion,
     latestVersion: appVersion,
-    releaseDate: '28 Sept 2026',
+    releaseDate: '20 Oct 2026',
     changelog: [
-      '🔥 Real-time Mobile to Mobile remote touch controller',
-      '🚀 In-App GitHub Auto-Update System with changelog viewer',
-      '✨ Interactive File Manager, Call Logs, App Manager & System Shell',
-      '💬 Voice Player, Photo & Document Attachment in Live Chat',
-      '📹 Fullscreen Video Call with Draggable Self-Camera & PiP Multitasking',
-      '⚡ Ultra-low latency 60 FPS mobile stream',
+      '⚡ Dynamic real-time Device ID connection across any mobile phone',
+      '🔄 Real-time bidirectional touch, keyboard, and navigation sync',
+      '🗑️ Dynamic Recent Devices persistence (removed dummy devices, deletions stay deleted)',
+      '🆔 Deterministic stable 6-digit Device ID per physical device',
+      '📱 Real mobile model name detection & incoming connection alerts',
     ],
   });
 
@@ -70,7 +68,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     try {
       const res = await checkForAppUpdates(appVersion);
       setUpdateInfo(res);
-      setIsUpdated(!res.hasUpdate);
       setHasNewUpdate(Boolean(res.hasUpdate));
     } catch (e) {
       // ignore
@@ -83,60 +80,46 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      setDownloadStarted(false);
       check();
     }
   }, [visible, appVersion]);
 
-  // Download and apply update
-  const handleDownloadUpdate = () => {
-    setIsDownloading(true);
-    setDownloadProgress(0);
-
-    const targetVersion = updateInfo.latestVersion || appVersion;
-
-    // Immediately trigger downloading the latest APK in background/browser
-    if (updateInfo.downloadUrl) {
-      Linking.canOpenURL(updateInfo.downloadUrl).then((supported) => {
-        if (supported) {
-          Linking.openURL(updateInfo.downloadUrl!);
-        }
-      }).catch(() => {});
+  // Real APK download action
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo.downloadUrl) {
+      Alert.alert('Download Error', 'No download URL available for this release.');
+      return;
     }
 
-    const interval = setInterval(() => {
-      setDownloadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsDownloading(false);
-          setIsUpdated(true);
+    setIsDownloading(true);
+    setDownloadStarted(true);
 
-          // Update global app version in store and hide red dot!
-          setAppVersion(targetVersion);
-          setHasNewUpdate(false);
-
-          setUpdateInfo((curr) => ({
-            ...curr,
-            hasUpdate: false,
-            currentVersion: targetVersion,
-            latestVersion: targetVersion,
-          }));
-
-          const msg = `🎉 Update v${targetVersion} APK download started!\nPlease install the downloaded APK to complete the update.`;
-          if (Platform.OS === 'android') {
-            ToastAndroid.show(msg, ToastAndroid.LONG);
-          } else {
-            Alert.alert('Download Started', msg);
-          }
-
-          return 100;
+    try {
+      const supported = await Linking.canOpenURL(updateInfo.downloadUrl);
+      if (supported) {
+        await Linking.openURL(updateInfo.downloadUrl);
+        const msg = `📥 Downloading v${updateInfo.latestVersion} APK...\nOnce downloaded, tap the notification to install the update.`;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(msg, ToastAndroid.LONG);
+        } else {
+          Alert.alert('Download Started', msg);
         }
-        return prev + 25;
-      });
-    }, 200);
+      } else {
+        Alert.alert('Download Error', 'Cannot open download link on this device.');
+      }
+    } catch (err: any) {
+      Alert.alert('Download Failed', err?.message || 'Could not launch browser to download APK.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const hasError = !!updateInfo.error && !loading;
-  const isUpToDate = (!updateInfo.hasUpdate || isUpdated) && !loading && !hasError;
+  const isUpToDate =
+    !hasError &&
+    !loading &&
+    (!updateInfo.hasUpdate || compareVersions(updateInfo.currentVersion, updateInfo.latestVersion) >= 0);
 
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
@@ -150,7 +133,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <View style={[styles.iconCircle, isUpToDate && styles.iconCircleGreen, hasError && { borderColor: '#ef4444' }]}>
+              <View
+                style={[
+                  styles.iconCircle,
+                  isUpToDate && styles.iconCircleGreen,
+                  hasError && { borderColor: '#ef4444' },
+                ]}>
                 {loading ? (
                   <Animated.View style={{ transform: [{ rotate: spin }] }}>
                     <VectorIcon name="update" size={20} color={Colors.brandGreen} />
@@ -195,11 +183,31 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
             <View style={styles.versionCol}>
               <Text style={styles.versionLabel}>Latest on GitHub</Text>
-              <Text style={[styles.versionValue, { color: hasError ? '#ef4444' : Colors.brandGreen }]}>
+              <Text
+                style={[
+                  styles.versionValue,
+                  { color: hasError ? '#ef4444' : Colors.brandGreen },
+                ]}>
                 {hasError ? 'Failed' : `v${updateInfo.latestVersion}`}
               </Text>
             </View>
           </View>
+
+          {/* Post-Download Instructions Banner */}
+          {downloadStarted && !isUpToDate && (
+            <View style={styles.instructionBox}>
+              <Text style={styles.instructionTitle}>📌 To complete update:</Text>
+              <Text style={styles.instructionStep}>
+                1. Pull down your phone's notification bar.
+              </Text>
+              <Text style={styles.instructionStep}>
+                2. Tap on the downloaded <Text style={{ fontWeight: '700', color: Colors.brandGreen }}>SM_Remote_Controller.apk</Text>.
+              </Text>
+              <Text style={styles.instructionStep}>
+                3. Tap <Text style={{ fontWeight: '700', color: Colors.textWhite }}>"Update"</Text> or <Text style={{ fontWeight: '700', color: Colors.textWhite }}>"Install"</Text> to apply.
+              </Text>
+            </View>
+          )}
 
           {/* Changelog Title */}
           <View style={styles.changelogHeader}>
@@ -229,20 +237,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             ))}
           </ScrollView>
 
-          {/* Download Progress Bar */}
-          {isDownloading && (
-            <View style={styles.progressSection}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressText}>Downloading update from GitHub...</Text>
-                <Text style={styles.progressPercent}>{downloadProgress}%</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${downloadProgress}%` }]} />
-              </View>
-            </View>
-          )}
-
-          {/* Action Button */}
+          {/* Action Buttons */}
           {hasError ? (
             <TouchableOpacity
               activeOpacity={0.8}
@@ -255,18 +250,27 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </Text>
             </TouchableOpacity>
           ) : !isUpToDate ? (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleDownloadUpdate}
-              disabled={isDownloading || loading}
-              style={styles.updateBtn}>
-              <VectorIcon name="download" size={16} color="#000000" />
-              <Text style={styles.updateBtnText}>
-                {isDownloading
-                  ? 'Downloading & Applying...'
-                  : `Update Now (v${updateInfo.latestVersion})`}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.actionButtonsCol}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleDownloadUpdate}
+                disabled={isDownloading || loading}
+                style={styles.updateBtn}>
+                <VectorIcon name="download" size={16} color="#000000" />
+                <Text style={styles.updateBtnText}>
+                  {downloadStarted
+                    ? `Re-download APK (v${updateInfo.latestVersion})`
+                    : `Update Now (v${updateInfo.latestVersion})`}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onClose}
+                style={styles.laterBtn}>
+                <Text style={styles.laterBtnText}>Remind Me Later</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.upToDateBanner}>
               <VectorIcon name="check" size={16} color={Colors.brandGreen} />
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.borderDark,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   versionCol: {
     flex: 1,
@@ -371,6 +375,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     fontFamily: 'monospace',
+  },
+  instructionBox: {
+    backgroundColor: 'rgba(45, 212, 191, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+    padding: 12,
+    marginBottom: 14,
+  },
+  instructionTitle: {
+    color: Colors.brandGreen,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  instructionStep: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    lineHeight: 17,
   },
   changelogHeader: {
     flexDirection: 'row',
@@ -394,7 +417,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   changelogList: {
-    maxHeight: 190,
+    maxHeight: 150,
     backgroundColor: Colors.appBg,
     borderRadius: 14,
     padding: 12,
@@ -419,33 +442,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     flex: 1,
   },
-  progressSection: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  progressText: {
-    color: Colors.textGray,
-    fontSize: 11,
-  },
-  progressPercent: {
-    color: Colors.brandGreen,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  progressBarBg: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.appBg,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: Colors.brandGreen,
-    borderRadius: 3,
+  actionButtonsCol: {
+    gap: 8,
   },
   updateBtn: {
     width: '100%',
@@ -461,6 +459,15 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 14,
     fontWeight: '700',
+  },
+  laterBtn: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  laterBtnText: {
+    color: Colors.textGray,
+    fontSize: 12,
+    fontWeight: '600',
   },
   upToDateBanner: {
     flexDirection: 'row',
@@ -478,5 +485,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-
 });
