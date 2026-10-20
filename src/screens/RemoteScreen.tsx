@@ -7,6 +7,7 @@ import {
   StyleSheet,
   StatusBar,
   Animated,
+  Easing,
   Modal,
   TextInput,
   KeyboardAvoidingView,
@@ -24,7 +25,7 @@ import { LivePulseBadge } from '../components/common/LivePulseBadge';
 import { useAppStore } from '../store/useAppStore';
 
 import { peerService } from '../services/peerService';
-import { screenStreamService, StreamStats } from '../services/screenStreamService';
+import { screenStreamService, StreamStats, LiveFrameData } from '../services/screenStreamService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -52,6 +53,68 @@ export const RemoteScreen: React.FC = () => {
 
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(1);
+
+  // Live remote frame from partner MediaProjection
+  const [liveFrame, setLiveFrame] = useState<string | null>(null);
+  const [viewportDimensions, setViewportDimensions] = useState({ width: SCREEN_WIDTH, height: 600 });
+
+  // Radar animation for scanner view
+  const radarSpinAnim = useRef(new Animated.Value(0)).current;
+  const radarPulseAnim = useRef(new Animated.Value(0.4)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const spinLoop = Animated.loop(
+      Animated.timing(radarSpinAnim, {
+        toValue: 1,
+        duration: 3500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(radarPulseAnim, {
+          toValue: 1,
+          duration: 1600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(radarPulseAnim, {
+          toValue: 0.4,
+          duration: 1600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    const spinnerLoop = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    spinLoop.start();
+    pulseLoop.start();
+    spinnerLoop.start();
+
+    return () => {
+      spinLoop.stop();
+      pulseLoop.stop();
+      spinnerLoop.stop();
+    };
+  }, [radarSpinAnim, radarPulseAnim, spinAnim]);
+
+  // Listen to live screen frames
+  useEffect(() => {
+    const unsub = screenStreamService.onLiveFrame((frame: LiveFrameData) => {
+      if (frame && frame.frameData) {
+        setLiveFrame(frame.frameData);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Live remote touch position
   const [cursorPos, setCursorPos] = useState({ x: 190, y: 260 });
@@ -178,15 +241,21 @@ export const RemoteScreen: React.FC = () => {
   // Touch handler to simulate remote touch move & tap
   const handleTouchScreen = (e: any) => {
     const { locationX, locationY } = e.nativeEvent;
-    if (locationX && locationY) {
+    if (locationX !== undefined && locationY !== undefined) {
       const x = Math.round(locationX);
       const y = Math.round(locationY);
       setCursorPos({ x, y });
       setTouchActive(true);
+
+      const w = viewportDimensions.width || SCREEN_WIDTH;
+      const h = viewportDimensions.height || 600;
+      const relX = Math.max(0, Math.min(1, locationX / w));
+      const relY = Math.max(0, Math.min(1, locationY / h));
+
       if (partnerCleanCode) {
-        peerService.sendTouch(partnerCleanCode, x, y);
+        peerService.sendTouch(partnerCleanCode, relX, relY);
       }
-      showToast(`👆 Remote Touch sent at (${x}, ${y})`, 'info');
+      showToast(`👆 Touch dispatched to partner screen`, 'info');
       setTimeout(() => setTouchActive(false), 800);
     }
   };
@@ -287,6 +356,76 @@ export const RemoteScreen: React.FC = () => {
       // ignore
     }
   };
+
+  if (!connectedDevice) {
+    const radarSpin = radarSpinAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+      <View style={[styles.container, styles.scannerContainer, { paddingTop: Math.max(insets.top + 16, 26) }]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+        {/* Top Header */}
+        <View style={styles.scannerHeaderRow}>
+          <View>
+            <Text style={[Typography.titleLarge, styles.scannerTitle]}>
+              REMOTE <Text style={styles.scannerBrandAccent}>SCREEN</Text>
+            </Text>
+            <Text style={styles.scannerSub}>Live Mobile-to-Mobile Display</Text>
+          </View>
+          <View style={styles.scannerIdleBadge}>
+            <View style={styles.scannerIdleDot} />
+            <Text style={styles.scannerIdleText}>SCANNER ACTIVE</Text>
+          </View>
+        </View>
+
+        {/* Center Animated Radar Scanner */}
+        <View style={styles.radarCenterArea}>
+          <View style={styles.radarRingOuter}>
+            {/* Pulsing ripple wave */}
+            <Animated.View
+              style={[
+                styles.radarRippleWave,
+                {
+                  transform: [{ scale: radarPulseAnim }],
+                  opacity: radarPulseAnim.interpolate({
+                    inputRange: [0.4, 1],
+                    outputRange: [0.7, 0],
+                  }),
+                },
+              ]}
+            />
+            {/* Rotating radar sweep ray */}
+            <Animated.View
+              style={[
+                styles.radarSweepRay,
+                { transform: [{ rotate: radarSpin }] },
+              ]}
+            />
+            {/* Center phone icon badge */}
+            <View style={styles.radarHub}>
+              <VectorIcon name="mobile" size={38} color={Colors.brandGreen} />
+            </View>
+          </View>
+
+          <Text style={styles.radarNoticeTitle}>Waiting for Live Connection</Text>
+          <Text style={styles.radarNoticeDesc}>
+            No active remote session is connected right now. Enter a 6-digit Partner ID on the Connect tab, or ask your partner to accept your connection request.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('home')}
+            style={[styles.goConnectBtn, Shadows.subtleNeon]}>
+            <VectorIcon name="link" size={16} color="#000000" />
+            <Text style={styles.goConnectBtnText}>Go to Connect Screen</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -408,68 +547,50 @@ export const RemoteScreen: React.FC = () => {
               </Text>
             </View>
 
-            {/* Remote Mobile Desktop Mockup Content */}
-            <View style={styles.remoteDesktop}>
-              <View style={styles.remoteAppGrid}>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#10b981' }]}>
-                    <Text style={styles.remoteAppEmoji}>📞</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Phone</Text>
+            {/* Real Captured Screen Viewport */}
+            <View
+              style={styles.realScreenDisplayArea}
+              onLayout={(e) => setViewportDimensions(e.nativeEvent.layout)}>
+              {liveFrame ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${liveFrame}` }}
+                  style={styles.realLiveFrameImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.waitingFrameContainer}>
+                  <Animated.View
+                    style={[
+                      styles.waitingSpinner,
+                      {
+                        transform: [
+                          {
+                            rotate: spinAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '360deg'],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}>
+                    <VectorIcon name="update" size={32} color={Colors.brandGreen} />
+                  </Animated.View>
+                  <Text style={styles.waitingFrameTitle}>Starting Screen Sharing...</Text>
+                  <Text style={styles.waitingFrameSub}>
+                    Connecting to {partnerName}'s live display.
+                  </Text>
+                  <Text style={styles.waitingFrameNote}>
+                    Even if {partnerName} minimizes SM Controller, their live Android screen will stream here in real time.
+                  </Text>
                 </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#3b82f6' }]}>
-                    <Text style={styles.remoteAppEmoji}>💬</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Messages</Text>
-                </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#f59e0b' }]}>
-                    <Text style={styles.remoteAppEmoji}>🌐</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Chrome</Text>
-                </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#ec4899' }]}>
-                    <Text style={styles.remoteAppEmoji}>📷</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Camera</Text>
-                </View>
-              </View>
-
-              <View style={[styles.remoteAppGrid, { marginTop: 16 }]}>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#6366f1' }]}>
-                    <Text style={styles.remoteAppEmoji}>⚙️</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Settings</Text>
-                </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#8b5cf6' }]}>
-                    <Text style={styles.remoteAppEmoji}>📁</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Files</Text>
-                </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#ef4444' }]}>
-                    <Text style={styles.remoteAppEmoji}>🖼️</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Gallery</Text>
-                </View>
-                <View style={styles.remoteAppIconCol}>
-                  <View style={[styles.remoteAppIcon, { backgroundColor: '#14b8a6' }]}>
-                    <Text style={styles.remoteAppEmoji}>🎮</Text>
-                  </View>
-                  <Text style={styles.remoteAppLabel}>Games</Text>
-                </View>
-              </View>
+              )}
             </View>
 
             {/* Minimized Background Streaming Info */}
             <View style={styles.backgroundStreamNotice}>
               <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
               <Text style={styles.backgroundStreamNoticeText}>
-                Touch Active: Real-time screen streaming & remote touch enabled
+                Live Touch &amp; Click Dispatch Active
               </Text>
             </View>
           </View>
@@ -1653,5 +1774,188 @@ const styles = StyleSheet.create({
     color: Colors.textWhite,
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  // --- Scanner & Radar Screen Styles ---
+  scannerContainer: {
+    backgroundColor: '#0a0d14',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  scannerHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  scannerTitle: {
+    color: Colors.textWhite,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  scannerBrandAccent: {
+    color: Colors.brandGreen,
+  },
+  scannerSub: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  scannerIdleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(45, 212, 191, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+  },
+  scannerIdleDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.brandGreen,
+  },
+  scannerIdleText: {
+    color: Colors.brandGreen,
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  radarCenterArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+  },
+  radarRingOuter: {
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 1.5,
+    borderColor: 'rgba(45, 212, 191, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    backgroundColor: 'rgba(10, 16, 26, 0.6)',
+    marginBottom: 28,
+  },
+  radarRippleWave: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 2,
+    borderColor: Colors.brandGreen,
+    backgroundColor: 'rgba(45, 212, 191, 0.08)',
+  },
+  radarSweepRay: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    top: 10,
+    right: 10,
+    borderTopRightRadius: 110,
+    backgroundColor: 'rgba(45, 212, 191, 0.18)',
+  },
+  radarHub: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#121824',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.brandGreen,
+    shadowColor: Colors.brandGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  radarNoticeTitle: {
+    color: Colors.textWhite,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  radarNoticeDesc: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    maxWidth: 320,
+    marginBottom: 24,
+  },
+  goConnectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.brandGreen,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  goConnectBtnText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // --- Live Screen Real Viewport Styles ---
+  realScreenDisplayArea: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    overflow: 'hidden',
+  },
+  realLiveFrameImage: {
+    width: '100%',
+    height: '100%',
+  },
+  waitingFrameContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    maxWidth: 340,
+  },
+  waitingSpinner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(45, 212, 191, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.3)',
+  },
+  waitingFrameTitle: {
+    color: Colors.textWhite,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  waitingFrameSub: {
+    color: Colors.brandGreen,
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  waitingFrameNote: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

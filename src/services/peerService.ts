@@ -435,12 +435,12 @@ class PeerService {
   /**
    * Send touch coordinate to partner
    */
-  public sendTouch(targetId: string, x: number, y: number) {
+  public sendTouch(targetId: string, relX: number, relY: number) {
     this.sendToDevice(targetId, {
       type: 'TOUCH',
       fromId: this.getSelfCleanId(),
       fromName: this.selfName,
-      payload: { x, y },
+      payload: { relX, relY, x: relX, y: relY },
       timestamp: Date.now(),
     });
   }

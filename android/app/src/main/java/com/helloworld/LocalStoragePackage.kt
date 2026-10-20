@@ -9,7 +9,10 @@ import com.facebook.react.uimanager.ViewManager
 
 class LocalStoragePackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(LocalStorageModule(reactContext))
+        return listOf(
+            LocalStorageModule(reactContext),
+            ScreenCaptureModule(reactContext)
+        )
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<View, ReactShadowNode<*>>> {

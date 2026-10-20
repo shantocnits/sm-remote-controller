@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SM CONTROLLER</string>
+    <string name="accessibility_service_description">Enables real-time remote touch, tap, and navigation dispatch for SM Controller remote sessions.</string>
 </resources>

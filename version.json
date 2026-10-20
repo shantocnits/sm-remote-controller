@@ -1,15 +1,15 @@
 {
-  "version": "1.5.4",
-  "versionCode": 10,
+  "version": "1.5.5",
+  "versionCode": 11,
   "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.4/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.5/SM_Remote_Controller.apk",
   "changelog": [
-    "🚀 Enterprise Multi-Broker MQTT Signaling Cluster (EMQX + HiveMQ)",
-    "⚡ Instant AnyDesk-style incoming request popup with zero delay",
-    "🛡️ Fixed package visibility download error on Android 11-15",
-    "📱 Real-time remote screen viewing & bidirectional touch dispatch",
-    "✅ Persistent update suppression: Never prompts duplicate updates on app restart",
-    "🗑️ 100% offline Recent Devices persistence with native SharedPreferences"
+    "📱 Real-time Android MediaProjection Foreground Screen Capture Service",
+    "⚡ Seamless background screen streaming (even when app is minimized)",
+    "📡 Interactive Radar Scanner View replaces all dummy app icons on Screen tab",
+    "👆 Real remote touch, click & Android system navigation (Back/Home/Recents)",
+    "🚀 Multi-Broker MQTT Signaling with zero latency and instant popups",
+    "✅ Offline Recent Devices persistence and auto-suppressed duplicate updates"
   ]
 }

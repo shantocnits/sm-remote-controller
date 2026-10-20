@@ -1,15 +1,14 @@
-import { Dimensions, Platform } from 'react-native';
+import { NativeModules, DeviceEventEmitter, Platform } from 'react-native';
 import { peerService } from './peerService';
 import { getCleanDeviceId, getDeviceIdentity } from '../utils/deviceUtils';
 
-export interface StreamFrame {
-  frameIndex: number;
-  timestamp: number;
-  batteryLevel: number;
+const { ScreenCaptureModule } = NativeModules;
+
+export interface LiveFrameData {
+  frameData: string; // base64 JPEG
   width: number;
   height: number;
-  status: 'ACTIVE' | 'PAUSED' | 'LOCKED';
-  activeApp: string;
+  timestamp: number;
 }
 
 export interface StreamStats {
@@ -20,36 +19,73 @@ export interface StreamStats {
   statusText: string;
 }
 
-type FrameListener = (frame: StreamFrame) => void;
+type LiveFrameListener = (frame: LiveFrameData) => void;
 type StatsListener = (stats: StreamStats) => void;
 
 class ScreenStreamService {
   private isBroadcasting: boolean = false;
   private isReceiving: boolean = false;
   private currentPartnerId: string | null = null;
-  private broadcastTimer: any = null;
   private frameCount: number = 0;
-  private lastPingSentTime: number = 0;
-  private currentPingMs: number = 32;
   private currentFps: number = 60;
   private fpsCounter: number = 0;
   private lastFpsCalcTime: number = Date.now();
+  private currentPingMs: number = 24;
+  private latestFrameData: LiveFrameData | null = null;
 
-  private frameListeners: Set<FrameListener> = new Set();
+  private frameListeners: Set<LiveFrameListener> = new Set();
   private statsListeners: Set<StatsListener> = new Set();
+  private nativeFrameSub: any = null;
+
+  constructor() {
+    this.setupNativeFrameListener();
+  }
 
   /**
-   * Subscribe to incoming live screen frames
+   * Listen to frames captured by Android MediaProjection Foreground Service
    */
-  public onFrame(listener: FrameListener): () => void {
+  private setupNativeFrameListener() {
+    if (Platform.OS !== 'android') return;
+
+    this.nativeFrameSub = DeviceEventEmitter.addListener('onScreenFrame', (event: any) => {
+      if (!this.isBroadcasting || !this.currentPartnerId) return;
+
+      if (event && event.frame) {
+        this.frameCount++;
+
+        // Send frame packet to viewer device via MQTT QoS 0 for fast streaming
+        peerService.sendToDevice(this.currentPartnerId, {
+          type: 'HEARTBEAT',
+          fromId: getCleanDeviceId(),
+          fromName: getDeviceIdentity().deviceName,
+          payload: {
+            streamEvent: 'LIVE_FRAME',
+            frameData: event.frame,
+            width: event.width || 540,
+            height: event.height || 960,
+            timestamp: Date.now(),
+          },
+          timestamp: Date.now(),
+        });
+      }
+    });
+  }
+
+  /**
+   * Subscribe to incoming live screen frames (Viewer side)
+   */
+  public onLiveFrame(listener: LiveFrameListener): () => void {
     this.frameListeners.add(listener);
+    if (this.latestFrameData) {
+      listener(this.latestFrameData);
+    }
     return () => {
       this.frameListeners.delete(listener);
     };
   }
 
   /**
-   * Subscribe to stream quality and connection stats
+   * Subscribe to stream quality and stats
    */
   public onStats(listener: StatsListener): () => void {
     this.statsListeners.add(listener);
@@ -74,68 +110,43 @@ class ScreenStreamService {
   }
 
   /**
-   * Start broadcasting this device's screen to controller partner
+   * Start broadcasting this device's screen (Callee side)
    */
-  public startBroadcasting(partnerCleanId: string) {
+  public async startBroadcasting(partnerCleanId: string) {
     if (this.isBroadcasting) return;
 
     this.isBroadcasting = true;
     this.currentPartnerId = partnerCleanId;
     this.frameCount = 0;
 
-    const selfId = getCleanDeviceId();
-    const identity = getDeviceIdentity();
+    console.log(`[ScreenStreamService] Requesting Android MediaProjection capture for ${partnerCleanId}`);
 
-    console.log(`[ScreenStreamService] Started broadcasting to ${partnerCleanId}`);
-
-    // Send STREAM_STARTED signal once
-    peerService.sendToDevice(partnerCleanId, {
-      type: 'HEARTBEAT',
-      fromId: selfId,
-      fromName: identity.deviceName,
-      payload: {
-        streamEvent: 'STREAM_STARTED',
-        width: identity.width,
-        height: identity.height,
-        fps: 60,
-      },
-      timestamp: Date.now(),
-    });
-
-    this.notifyStats('Live Mobile Stream Active • 60 FPS');
-
-    // Keepalive heartbeat sent only once every 12 seconds to prevent rate-limiting
-    this.broadcastTimer = setInterval(() => {
-      if (!this.isBroadcasting || !this.currentPartnerId) {
-        this.stopBroadcasting();
-        return;
+    // Request native Android MediaProjection screen capture
+    if (ScreenCaptureModule && typeof ScreenCaptureModule.requestAndStartCapture === 'function') {
+      try {
+        await ScreenCaptureModule.requestAndStartCapture();
+        console.log('[ScreenStreamService] Android MediaProjection started successfully');
+      } catch (err) {
+        console.warn('[ScreenStreamService] Screen capture permission denied or failed:', err);
       }
+    }
 
-      this.frameCount++;
-
-      peerService.sendToDevice(this.currentPartnerId, {
-        type: 'HEARTBEAT',
-        fromId: selfId,
-        fromName: identity.deviceName,
-        payload: {
-          streamEvent: 'HEARTBEAT_SYNC',
-          batteryLevel: 85,
-          timestamp: Date.now(),
-        },
-        timestamp: Date.now(),
-      });
-    }, 12000);
+    this.notifyStats('Screen Sharing Active • Live');
   }
 
   /**
    * Stop broadcasting
    */
-  public stopBroadcasting() {
-    if (this.broadcastTimer) {
-      clearInterval(this.broadcastTimer);
-      this.broadcastTimer = null;
+  public async stopBroadcasting() {
+    this.isBroadcasting = false;
+
+    if (ScreenCaptureModule && typeof ScreenCaptureModule.stopCapture === 'function') {
+      try {
+        await ScreenCaptureModule.stopCapture();
+      } catch (e) {}
     }
-    if (this.isBroadcasting && this.currentPartnerId) {
+
+    if (this.currentPartnerId) {
       peerService.sendToDevice(this.currentPartnerId, {
         type: 'HEARTBEAT',
         fromId: getCleanDeviceId(),
@@ -144,13 +155,13 @@ class ScreenStreamService {
         timestamp: Date.now(),
       });
     }
-    this.isBroadcasting = false;
+
     this.currentPartnerId = null;
-    this.notifyStats('Stream Stopped');
+    this.notifyStats('Screen Sharing Stopped');
   }
 
   /**
-   * Start receiving live stream from partner (Viewer Mode)
+   * Start receiving stream from remote device (Viewer side)
    */
   public startReceiving(partnerCleanId: string) {
     this.isReceiving = true;
@@ -158,58 +169,9 @@ class ScreenStreamService {
     this.frameCount = 0;
     this.lastFpsCalcTime = Date.now();
     this.fpsCounter = 0;
+    this.latestFrameData = null;
 
-    this.notifyStats('Connecting to remote stream...');
-
-    // Request stream start from partner
-    peerService.sendToDevice(partnerCleanId, {
-      type: 'HEARTBEAT',
-      fromId: getCleanDeviceId(),
-      fromName: getDeviceIdentity().deviceName,
-      payload: { streamEvent: 'REQUEST_STREAM_START' },
-      timestamp: Date.now(),
-    });
-  }
-
-  /**
-   * Handle incoming message from peerService
-   */
-  public handlePeerMessage(msg: any) {
-    if (msg.type !== 'HEARTBEAT' || !msg.payload) return;
-    const { streamEvent, frame } = msg.payload;
-
-    if (streamEvent === 'FRAME_SYNC' && frame) {
-      this.frameCount++;
-      this.fpsCounter++;
-
-      const now = Date.now();
-      const elapsed = now - this.lastFpsCalcTime;
-      if (elapsed >= 1000) {
-        this.currentFps = Math.max(30, Math.min(60, Math.round((this.fpsCounter * 1000) / elapsed) * 4));
-        this.fpsCounter = 0;
-        this.lastFpsCalcTime = now;
-      }
-
-      if (frame.timestamp) {
-        const ping = now - frame.timestamp;
-        if (ping > 0 && ping < 500) {
-          this.currentPingMs = ping;
-        }
-      }
-
-      this.frameListeners.forEach((l) => {
-        try {
-          l(frame);
-        } catch (e) {}
-      });
-
-      this.notifyStats('Live Connected • 60 FPS • 1080p');
-    } else if (streamEvent === 'REQUEST_STREAM_START') {
-      this.startBroadcasting(msg.fromId);
-    } else if (streamEvent === 'STREAM_STOPPED') {
-      this.isReceiving = false;
-      this.notifyStats('Remote Device Stopped Screen Sharing');
-    }
+    this.notifyStats('Connecting to live mobile stream...');
   }
 
   /**
@@ -218,7 +180,80 @@ class ScreenStreamService {
   public stopReceiving() {
     this.isReceiving = false;
     this.currentPartnerId = null;
+    this.latestFrameData = null;
     this.notifyStats('Disconnected');
+  }
+
+  /**
+   * Handle incoming peer message containing live screen frames or control events
+   */
+  public handlePeerMessage(msg: any) {
+    if (!msg) return;
+
+    // 1. Live screen frames from remote device
+    if (msg.type === 'HEARTBEAT' && msg.payload) {
+      const { streamEvent, frameData, width, height, timestamp } = msg.payload;
+
+      if (streamEvent === 'LIVE_FRAME' && frameData) {
+        this.frameCount++;
+        this.fpsCounter++;
+
+        const now = Date.now();
+        const elapsed = now - this.lastFpsCalcTime;
+        if (elapsed >= 1000) {
+          this.currentFps = Math.max(15, Math.round((this.fpsCounter * 1000) / elapsed));
+          this.fpsCounter = 0;
+          this.lastFpsCalcTime = now;
+        }
+
+        if (timestamp) {
+          const ping = now - timestamp;
+          if (ping > 0 && ping < 500) {
+            this.currentPingMs = ping;
+          }
+        }
+
+        const frameObj: LiveFrameData = {
+          frameData,
+          width: width || 540,
+          height: height || 960,
+          timestamp: timestamp || now,
+        };
+        this.latestFrameData = frameObj;
+
+        this.frameListeners.forEach((listener) => {
+          try {
+            listener(frameObj);
+          } catch (e) {}
+        });
+
+        this.notifyStats('Live Connected • 60 FPS • Real Mobile Screen');
+      } else if (streamEvent === 'STREAM_STOPPED') {
+        this.isReceiving = false;
+        this.latestFrameData = null;
+        this.notifyStats('Partner Stopped Screen Sharing');
+      }
+    }
+
+    // 2. Incoming touch dispatch from remote controller phone (Host side)
+    if (msg.type === 'TOUCH' && msg.payload) {
+      const { relX, relY } = msg.payload;
+      if (typeof relX === 'number' && typeof relY === 'number') {
+        if (ScreenCaptureModule && typeof ScreenCaptureModule.dispatchTouch === 'function') {
+          ScreenCaptureModule.dispatchTouch(relX, relY).catch(() => {});
+        }
+      }
+    }
+
+    // 3. Incoming navigation dispatch (Host side)
+    if (msg.type === 'NAV' && msg.payload) {
+      const { action } = msg.payload;
+      if (action) {
+        if (ScreenCaptureModule && typeof ScreenCaptureModule.dispatchNav === 'function') {
+          ScreenCaptureModule.dispatchNav(action).catch(() => {});
+        }
+      }
+    }
   }
 
   public getStats(): StreamStats {
@@ -228,11 +263,15 @@ class ScreenStreamService {
       receivedFrames: this.frameCount,
       isStreaming: this.isReceiving || this.isBroadcasting,
       statusText: this.isReceiving
-        ? 'Live Connected • 60 FPS'
+        ? 'Live Connected • Real Screen'
         : this.isBroadcasting
-        ? 'Broadcasting to Remote'
+        ? 'Screen Sharing Active'
         : 'Idle',
     };
+  }
+
+  public getLatestFrame(): LiveFrameData | null {
+    return this.latestFrameData;
   }
 }
 
