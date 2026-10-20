@@ -17,6 +17,7 @@ import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { VectorIcon } from './VectorIcon';
 import { checkForAppUpdates, UpdateInfo, compareVersions } from '../../services/updateService';
+import { storageService } from '../../services/storageService';
 import { Shadows } from '../../theme/shadows';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -98,8 +99,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     try {
       const supported = await Linking.canOpenURL(updateInfo.downloadUrl);
       if (supported) {
+        await storageService.setAcknowledgedUpdateVersion(updateInfo.latestVersion);
         await Linking.openURL(updateInfo.downloadUrl);
-        const msg = `📥 Downloading v${updateInfo.latestVersion} APK...\nOnce downloaded, tap the notification to install the update.`;
+        setHasNewUpdate(false);
+        const msg = `📥 Downloading v${updateInfo.latestVersion} APK...\nOnce downloaded, tap the notification or open Downloads to install the update.`;
         if (Platform.OS === 'android') {
           ToastAndroid.show(msg, ToastAndroid.LONG);
         } else {
@@ -266,7 +269,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => {
+                onPress={async () => {
+                  await storageService.setAcknowledgedUpdateVersion(updateInfo.latestVersion);
                   setHasNewUpdate(false);
                   onClose();
                 }}

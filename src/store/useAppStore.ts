@@ -4,6 +4,7 @@ import { ActiveTab, AppMode, AudioCallStatus, ChatMessage, Device, VideoCallStat
 import versionConfig from '../../version.json';
 import { peerService } from '../services/peerService';
 import { screenStreamService } from '../services/screenStreamService';
+import { storageService } from '../services/storageService';
 import { getCleanDeviceId } from '../utils/deviceUtils';
 
 const CURRENT_VERSION = versionConfig.version || '1.5.0';
@@ -152,13 +153,21 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   setIncomingRequest: (req) => set({ incomingRequest: req }),
   setIncomingPartner: (partner) => set({ incomingPartner: partner }),
 
-  // Load saved devices from cloud cache on startup
+  // Load saved devices from local storage and cloud on startup
   loadSavedDevices: async () => {
     try {
+      // 1. Instant offline load from native SharedPreferences
+      const local = await storageService.getSavedDevices();
+      if (Array.isArray(local) && local.length > 0) {
+        set({ devices: local });
+      }
+
+      // 2. Cloud sync fallback
       const selfId = getCleanDeviceId();
       const saved = await peerService.loadRecentDevices(selfId);
-      if (Array.isArray(saved)) {
+      if (Array.isArray(saved) && saved.length > 0) {
         set({ devices: saved });
+        storageService.saveDevices(saved);
       }
     } catch (e) {
       console.warn('[useAppStore] loadSavedDevices error:', e);
@@ -205,7 +214,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       connectedDevice: targetDevice,
     });
 
-    // Persist immediately
+    // Persist immediately to both offline SharedPreferences and cloud
+    storageService.saveDevices(updatedDevices);
     peerService.saveRecentDevices(getCleanDeviceId(), updatedDevices);
     return targetDevice;
   },
@@ -331,6 +341,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return 0;
       });
 
+      storageService.saveDevices(sorted);
       peerService.saveRecentDevices(getCleanDeviceId(), sorted);
       return { devices: sorted };
     });
@@ -341,6 +352,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const updated = state.devices.map((d) =>
         d.id === id ? { ...d, nickname: nickname.trim() || undefined } : d
       );
+      storageService.saveDevices(updated);
       peerService.saveRecentDevices(getCleanDeviceId(), updated);
       return { devices: updated };
     });
@@ -350,6 +362,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set((state) => {
       const updated = state.devices.filter((d) => d.id !== id);
       // Persist deletion immediately so it never comes back
+      storageService.saveDevices(updated);
       peerService.saveRecentDevices(getCleanDeviceId(), updated);
       return { devices: updated };
     });
@@ -358,6 +371,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   clearDevices: () => {
     set({ devices: [] });
     // Persist empty list so it never restores old devices
+    storageService.saveDevices([]);
     peerService.saveRecentDevices(getCleanDeviceId(), []);
   },
 

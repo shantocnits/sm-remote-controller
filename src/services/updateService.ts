@@ -18,7 +18,11 @@ const UPDATE_ENDPOINTS = [
   `https://fastly.jsdelivr.net/gh/shantocnits/sm-remote-controller@main/version.json`,
 ];
 
+import { storageService } from './storageService';
+
 export const checkForAppUpdates = async (currentVersion = DEFAULT_VERSION): Promise<UpdateInfo> => {
+  const acknowledgedVersion = await storageService.getAcknowledgedUpdateVersion().catch(() => null);
+
   // 1. Try JSON endpoints with Multi-CDN mirror fallbacks
   for (const baseUrl of UPDATE_ENDPOINTS) {
     try {
@@ -35,13 +39,18 @@ export const checkForAppUpdates = async (currentVersion = DEFAULT_VERSION): Prom
       if (response.ok) {
         const data = await response.json();
         const latestVer = data.version || '1.0.0';
-        const hasUpdate = compareVersions(latestVer, currentVersion) > 0;
+        let hasUpdate = compareVersions(latestVer, currentVersion) > 0;
+
+        // If user already clicked update or acknowledged this version in older app, do NOT prompt again
+        if (hasUpdate && acknowledgedVersion && compareVersions(latestVer, acknowledgedVersion) <= 0) {
+          hasUpdate = false;
+        }
 
         return {
           hasUpdate,
           currentVersion,
           latestVersion: latestVer,
-          releaseDate: data.releaseDate || '2026-09-28',
+          releaseDate: data.releaseDate || '2026-10-20',
           downloadUrl: data.downloadUrl || `https://github.com/shantocnits/sm-remote-controller/releases/download/v${latestVer}/SM_Remote_Controller.apk`,
           exeUrl: data.exeUrl || `https://github.com/shantocnits/sm-remote-controller/releases/download/v${latestVer}/SM_Remote_Controller.exe`,
           changelog: Array.isArray(data.changelog) && data.changelog.length > 0 ? data.changelog : [
@@ -73,7 +82,12 @@ export const checkForAppUpdates = async (currentVersion = DEFAULT_VERSION): Prom
       const releaseData = await apiRes.json();
       const rawTag = releaseData.tag_name || '1.0.0';
       const latestVer = rawTag.replace(/^v/, '');
-      const hasUpdate = compareVersions(latestVer, currentVersion) > 0;
+      let hasUpdate = compareVersions(latestVer, currentVersion) > 0;
+
+      // If user already clicked update or acknowledged this version in older app, do NOT prompt again
+      if (hasUpdate && acknowledgedVersion && compareVersions(latestVer, acknowledgedVersion) <= 0) {
+        hasUpdate = false;
+      }
 
       let apkUrl = `https://github.com/shantocnits/sm-remote-controller/releases/download/${rawTag}/SM_Remote_Controller.apk`;
       let exeUrl = `https://github.com/shantocnits/sm-remote-controller/releases/download/${rawTag}/SM_Remote_Controller.exe`;
@@ -96,7 +110,7 @@ export const checkForAppUpdates = async (currentVersion = DEFAULT_VERSION): Prom
         hasUpdate,
         currentVersion,
         latestVersion: latestVer,
-        releaseDate: releaseData.published_at ? releaseData.published_at.slice(0, 10) : '2026-09-28',
+        releaseDate: releaseData.published_at ? releaseData.published_at.slice(0, 10) : '2026-10-20',
         downloadUrl: apkUrl,
         exeUrl: exeUrl,
         changelog: changelogLines.length > 0 ? changelogLines : ['⚡ Latest improvements available'],
