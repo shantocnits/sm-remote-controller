@@ -1,8 +1,11 @@
 import { create } from 'zustand';
+import { Alert } from 'react-native';
 import { ActiveTab, AppMode, AudioCallStatus, ChatMessage, Device, VideoCallStatus } from '../types';
 import versionConfig from '../../version.json';
+import { peerService } from '../services/peerService';
+import { getCleanDeviceId } from '../utils/deviceUtils';
 
-const CURRENT_VERSION = versionConfig.version || '1.4.0';
+const CURRENT_VERSION = versionConfig.version || '1.5.0';
 
 interface AppStoreState {
   // Mode & Navigation
@@ -11,7 +14,12 @@ interface AppStoreState {
   isModeDropdownOpen: boolean;
   partnerIdInput: string;
 
-  // Devices
+  // Real-time P2P Connection States
+  isConnecting: boolean;
+  connectionError: string | null;
+  incomingPartner: { id: string; name: string } | null;
+
+  // Devices (Real dynamic recent devices, persistent)
   devices: Device[];
   connectedDevice: Device | null;
 
@@ -42,14 +50,17 @@ interface AppStoreState {
   closeModeDropdown: () => void;
   setPartnerIdInput: (val: string) => void;
 
-  // Device Actions
+  // Device & P2P Actions
+  loadSavedDevices: () => Promise<void>;
   addDevice: (code: string, customName?: string, type?: 'mobile' | 'desktop') => Device;
-  connectToPartner: (code: string) => Device;
+  connectToPartner: (code: string) => Promise<boolean>;
   setConnectedDevice: (device: Device | null) => void;
+  setIncomingPartner: (partner: { id: string; name: string } | null) => void;
   togglePinDevice: (id: string) => void;
   setDeviceNickname: (id: string, nickname: string) => void;
   removeDevice: (id: string) => void;
   clearDevices: () => void;
+  disconnectSession: () => void;
 
   // Video Call Actions
   startVideoCall: () => void;
@@ -76,38 +87,7 @@ interface AppStoreState {
   tickVoiceTimer: () => void;
 }
 
-const initialDevices: Device[] = [
-  {
-    id: '1',
-    name: 'Galaxy S23 Ultra',
-    code: '412 887',
-    type: 'mobile',
-    isPinned: false,
-  },
-  {
-    id: '2',
-    name: 'Pixel 8 Pro',
-    code: '882 109',
-    type: 'mobile',
-    isPinned: false,
-  },
-];
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    sender: 'partner',
-    text: 'Hey, device is connected perfectly!',
-    time: '10:42 AM',
-  },
-  {
-    id: 'msg-2',
-    sender: 'self',
-    text: 'Can you check the file manager? I sent a photo.',
-    time: '10:44 AM',
-    isDelivered: true,
-  },
-];
+const initialMessages: ChatMessage[] = [];
 
 export const useAppStore = create<AppStoreState>((set, get) => ({
   // Mode & Navigation - strictly Mobile to Mobile
@@ -116,9 +96,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   isModeDropdownOpen: false,
   partnerIdInput: '',
 
-  // Devices
-  devices: initialDevices,
-  connectedDevice: initialDevices[0],
+  // Connection states
+  isConnecting: false,
+  connectionError: null,
+  incomingPartner: null,
+
+  // Devices: Starts empty, purely dynamic and cloud-persisted
+  devices: [],
+  connectedDevice: null,
 
   // Calls
   videoCallStatus: 'idle',
@@ -134,7 +119,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   voiceSeconds: 0,
 
   // Mode selection
-  setMode: (mode: AppMode) => {
+  setMode: (_mode: AppMode) => {
     set({
       currentMode: 'm2m',
       isModeDropdownOpen: false,
@@ -154,10 +139,23 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   setHasNewUpdate: (val: boolean) => set({ hasNewUpdate: val }),
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
-
   setConnectedDevice: (device: Device | null) => set({ connectedDevice: device }),
+  setIncomingPartner: (partner) => set({ incomingPartner: partner }),
 
-  addDevice: (code: string, customName?: string, type?: 'mobile' | 'desktop') => {
+  // Load saved devices from cloud cache on startup
+  loadSavedDevices: async () => {
+    try {
+      const selfId = getCleanDeviceId();
+      const saved = await peerService.loadRecentDevices(selfId);
+      if (Array.isArray(saved)) {
+        set({ devices: saved });
+      }
+    } catch (e) {
+      console.warn('[useAppStore] loadSavedDevices error:', e);
+    }
+  },
+
+  addDevice: (code: string, customName?: string, _type?: 'mobile' | 'desktop') => {
     const cleanDigits = code.replace(/[^0-9]/g, '');
     const formattedCode =
       cleanDigits.length === 6
@@ -169,44 +167,94 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       (d) => d.code.replace(/\s+/g, '') === cleanDigits
     );
 
+    let updatedDevices: Device[];
+    let targetDevice: Device;
+
     if (existing) {
-      const reordered = [
-        existing,
+      targetDevice = {
+        ...existing,
+        name: customName || existing.name,
+      };
+      updatedDevices = [
+        targetDevice,
         ...currentDevices.filter((d) => d.id !== existing.id),
       ];
-      set({ devices: reordered, connectedDevice: existing });
-      return existing;
+    } else {
+      targetDevice = {
+        id: `dev-${cleanDigits}-${Date.now()}`,
+        name: customName || `Mobile (${formattedCode})`,
+        code: formattedCode,
+        type: 'mobile',
+        isPinned: false,
+      };
+      updatedDevices = [targetDevice, ...currentDevices];
     }
 
-    const defaultName = `Galaxy Phone (${formattedCode})`;
-
-    const newDevice: Device = {
-      id: `dev-${Date.now()}`,
-      name: customName || defaultName,
-      code: formattedCode,
-      type: 'mobile',
-      isPinned: false,
-    };
-
     set({
-      devices: [newDevice, ...currentDevices],
-      connectedDevice: newDevice,
+      devices: updatedDevices,
+      connectedDevice: targetDevice,
     });
-    return newDevice;
+
+    // Persist immediately
+    peerService.saveRecentDevices(getCleanDeviceId(), updatedDevices);
+    return targetDevice;
   },
 
-  connectToPartner: (code: string) => {
-    const target = get().addDevice(code);
-    set({ activeTab: 'remote' });
-    return target;
+  connectToPartner: async (code: string) => {
+    const cleanDigits = code.replace(/[^0-9]/g, '');
+    const selfId = getCleanDeviceId();
+
+    if (cleanDigits === selfId) {
+      Alert.alert(
+        'Same Device ID',
+        'You cannot connect to your own phone ID. Please enter the Partner ID shown on the other phone.'
+      );
+      return false;
+    }
+
+    if (cleanDigits.length < 3) {
+      Alert.alert('Invalid ID', 'Please enter a valid 6-digit Partner ID.');
+      return false;
+    }
+
+    set({ isConnecting: true, connectionError: null });
+
+    const result = await peerService.requestConnect(cleanDigits);
+
+    if (result.success) {
+      const partnerDevice = get().addDevice(cleanDigits, result.partnerName);
+      set({
+        isConnecting: false,
+        connectedDevice: partnerDevice,
+        activeTab: 'remote',
+        partnerIdInput: '',
+      });
+      return true;
+    } else {
+      const errMsg =
+        result.error ||
+        `Device ${code} is offline or not reachable. Make sure the app is opened on the partner's phone.`;
+      set({ isConnecting: false, connectionError: errMsg });
+      Alert.alert('Connection Failed', errMsg);
+      return false;
+    }
+  },
+
+  disconnectSession: () => {
+    const current = get().connectedDevice;
+    if (current) {
+      peerService.sendDisconnect(current.code.replace(/[^0-9]/g, ''));
+    }
+    set({
+      connectedDevice: null,
+      activeTab: 'home',
+      incomingPartner: null,
+    });
   },
 
   // Device actions
   togglePinDevice: (id: string) => {
     set((state) => {
-      const target = state.devices.find((d) => d.id === id);
-      if (!target) return state;
-
       const updated = state.devices.map((d) =>
         d.id === id ? { ...d, isPinned: !d.isPinned } : d
       );
@@ -217,25 +265,35 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return 0;
       });
 
+      peerService.saveRecentDevices(getCleanDeviceId(), sorted);
       return { devices: sorted };
     });
   },
 
   setDeviceNickname: (id: string, nickname: string) => {
-    set((state) => ({
-      devices: state.devices.map((d) =>
+    set((state) => {
+      const updated = state.devices.map((d) =>
         d.id === id ? { ...d, nickname: nickname.trim() || undefined } : d
-      ),
-    }));
+      );
+      peerService.saveRecentDevices(getCleanDeviceId(), updated);
+      return { devices: updated };
+    });
   },
 
   removeDevice: (id: string) => {
-    set((state) => ({
-      devices: state.devices.filter((d) => d.id !== id),
-    }));
+    set((state) => {
+      const updated = state.devices.filter((d) => d.id !== id);
+      // Persist deletion immediately so it never comes back
+      peerService.saveRecentDevices(getCleanDeviceId(), updated);
+      return { devices: updated };
+    });
   },
 
-  clearDevices: () => set({ devices: [] }),
+  clearDevices: () => {
+    set({ devices: [] });
+    // Persist empty list so it never restores old devices
+    peerService.saveRecentDevices(getCleanDeviceId(), []);
+  },
 
   // Video calls
   startVideoCall: () => set({ videoCallStatus: 'ringing', videoSeconds: 0 }),

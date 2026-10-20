@@ -23,15 +23,19 @@ import { VectorIcon } from '../components/common/VectorIcon';
 import { LivePulseBadge } from '../components/common/LivePulseBadge';
 import { useAppStore } from '../store/useAppStore';
 
+import { peerService } from '../services/peerService';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const RemoteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const connectedDevice = useAppStore((state) => state.connectedDevice);
+  const disconnectSession = useAppStore((state) => state.disconnectSession);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
 
-  const partnerName = connectedDevice?.name || 'Galaxy S23 Ultra';
-  const partnerCode = connectedDevice?.code || '948 201';
+  const partnerName = connectedDevice?.name || 'Remote Partner';
+  const partnerCode = connectedDevice?.code || '--- ---';
+  const partnerCleanCode = partnerCode.replace(/[^0-9]/g, '');
 
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(1);
@@ -90,6 +94,24 @@ export const RemoteScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Listen to remote events from partner
+  useEffect(() => {
+    const unsubscribe = peerService.addListener((msg) => {
+      if (msg.type === 'DISCONNECT') {
+        Alert.alert('Session Ended', 'Partner disconnected from the remote session.');
+        setActiveTab('home');
+      } else if (msg.type === 'TOUCH' && msg.payload) {
+        setCursorPos({ x: msg.payload.x, y: msg.payload.y });
+        setTouchActive(true);
+        setTimeout(() => setTouchActive(false), 800);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   // Screen recording timer
   useEffect(() => {
     let recTimer: any = null;
@@ -137,7 +159,7 @@ export const RemoteScreen: React.FC = () => {
     if (isRecording) {
       setIsRecording(false);
     }
-    setActiveTab('home');
+    disconnectSession();
   };
 
   // Touch handler to simulate remote touch move & tap
@@ -148,7 +170,10 @@ export const RemoteScreen: React.FC = () => {
       const y = Math.round(locationY);
       setCursorPos({ x, y });
       setTouchActive(true);
-      showToast(`👆 Remote Touch at (${x}, ${y})`, 'info');
+      if (partnerCleanCode) {
+        peerService.sendTouch(partnerCleanCode, x, y);
+      }
+      showToast(`👆 Remote Touch sent at (${x}, ${y})`, 'info');
       setTimeout(() => setTouchActive(false), 800);
     }
   };
@@ -218,6 +243,9 @@ export const RemoteScreen: React.FC = () => {
   };
 
   const handleSendKey = (keyName: string) => {
+    if (partnerCleanCode) {
+      peerService.sendKey(partnerCleanCode, keyName);
+    }
     setCommandLogs((prev) => [
       ...prev.slice(-5),
       `> Key [${keyName}] sent to remote`,
@@ -228,6 +256,9 @@ export const RemoteScreen: React.FC = () => {
   const handleSendTypedText = () => {
     if (!typedText.trim()) return;
     const txt = typedText.trim();
+    if (partnerCleanCode) {
+      peerService.sendKey(partnerCleanCode, txt);
+    }
     setCommandLogs((prev) => [...prev.slice(-5), `> ${txt}`]);
     showToast(`⌨️ Typed: "${txt}" sent to remote device`, 'success');
     setTypedText('');
@@ -375,17 +406,26 @@ export const RemoteScreen: React.FC = () => {
           {/* Android System Navigation Bar (Back, Home, Recents) */}
           <View style={styles.androidNavBar}>
             <TouchableOpacity
-              onPress={() => showToast('◁ Back navigation sent to device', 'info')}
+              onPress={() => {
+                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'back');
+                showToast('◁ Back navigation sent to device', 'info');
+              }}
               style={styles.navBarBtn}>
               <Text style={styles.navBarBtnText}>◁</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => showToast('○ Home navigation sent to device', 'info')}
+              onPress={() => {
+                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'home');
+                showToast('○ Home navigation sent to device', 'info');
+              }}
               style={styles.navBarBtn}>
               <Text style={styles.navBarBtnText}>○</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => showToast('▢ Recents navigation sent to device', 'info')}
+              onPress={() => {
+                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'recents');
+                showToast('▢ Recents navigation sent to device', 'info');
+              }}
               style={styles.navBarBtn}>
               <Text style={styles.navBarBtnText}>▢</Text>
             </TouchableOpacity>

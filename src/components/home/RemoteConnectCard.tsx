@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Keyboard,
+  ActivityIndicator,
+} from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Shadows } from '../../theme/shadows';
@@ -10,9 +19,10 @@ import { getClipboardText } from '../../utils/deviceUtils';
 
 export const RemoteConnectCard: React.FC = () => {
   const connectToPartner = useAppStore((state) => state.connectToPartner);
+  const isConnecting = useAppStore((state) => state.isConnecting);
   const [partnerId, setPartnerId] = useState('');
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     const cleanId = partnerId.replace(/[^0-9]/g, '');
     if (!cleanId || cleanId.length < 3) {
       Alert.alert('Partner ID Required', 'Please enter a valid 6-digit Partner ID to connect.');
@@ -20,7 +30,10 @@ export const RemoteConnectCard: React.FC = () => {
     }
 
     Keyboard.dismiss();
-    connectToPartner(cleanId);
+    const success = await connectToPartner(cleanId);
+    if (success) {
+      setPartnerId('');
+    }
   };
 
   const handlePasteClipboard = async () => {
@@ -39,7 +52,10 @@ export const RemoteConnectCard: React.FC = () => {
             Control Remote Device
           </Text>
         </View>
-        <TouchableOpacity activeOpacity={0.7} onPress={handlePasteClipboard}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handlePasteClipboard}
+          disabled={isConnecting}>
           <Text style={styles.pasteText}>Paste</Text>
         </TouchableOpacity>
       </View>
@@ -48,7 +64,7 @@ export const RemoteConnectCard: React.FC = () => {
         <View style={styles.inputWrapper}>
           <VectorIcon name="keyboard" size={16} color={Colors.textGray} />
           <TextInput
-            placeholder="Partner ID"
+            placeholder="Partner ID (e.g. 586 278)"
             placeholderTextColor={Colors.textGray}
             value={partnerId}
             onChangeText={setPartnerId}
@@ -58,6 +74,7 @@ export const RemoteConnectCard: React.FC = () => {
             blurOnSubmit={false}
             autoCorrect={false}
             autoCapitalize="none"
+            editable={!isConnecting}
             style={[Typography.monoText, styles.input]}
           />
         </View>
@@ -65,10 +82,24 @@ export const RemoteConnectCard: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleConnect}
+          disabled={isConnecting}
           style={[styles.arrowButton, Shadows.subtleNeon]}>
-          <VectorIcon name="arrow-right" size={20} color="#000000" />
+          {isConnecting ? (
+            <ActivityIndicator size="small" color="#000000" />
+          ) : (
+            <VectorIcon name="arrow-right" size={20} color="#000000" />
+          )}
         </TouchableOpacity>
       </View>
+
+      {isConnecting && (
+        <View style={styles.connectingBanner}>
+          <ActivityIndicator size="small" color={Colors.brandGreen} />
+          <Text style={styles.connectingText}>
+            Connecting to remote device... Please wait
+          </Text>
+        </View>
+      )}
     </NeonCard>
   );
 };
@@ -88,19 +119,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  modeTag: {
-    backgroundColor: 'rgba(45, 212, 191, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.3)',
-  },
-  modeTagText: {
-    color: Colors.brandGreen,
-    fontSize: 10,
-    fontWeight: '700',
   },
   title: {
     color: Colors.textSecondary,
@@ -139,5 +157,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.brandGreen,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  connectingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(45, 212, 191, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.25)',
+  },
+  connectingText: {
+    color: Colors.brandGreen,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

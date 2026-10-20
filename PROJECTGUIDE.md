@@ -21,7 +21,7 @@
 
 📍 **পাথ:** `apk/`
 - 📱 **`SM_Remote_Controller.apk`** — প্রধান ও লেটেস্ট অ্যান্ড্রয়েড APK (সরাসরি ফোনে ইনস্টল, শেয়ার বা GitHub Release-এ আপলোডের জন্য)।
-- 📱 **`SM_Remote_Controller_v1.5.0.apk`** — বর্তমান আপডেটেড ভার্সনসহ ব্যাকআপ APK।
+- 📱 **`SM_Remote_Controller_v1.5.1.apk`** — বর্তমান আপডেটেড ভার্সনসহ ব্যাকআপ APK।
 
 > 💡 **নোট:** আপনি যখনই `npm run build:apk` বা `node scripts/build_all.js` চালাবেন, স্ক্রিপ্টটি স্বয়ংক্রিয়ভাবে পুরনো ফাইল ক্লিন করে শুধুমাত্র এই দুটি ফাইল রাখবে।
 
@@ -43,21 +43,26 @@ node scripts/build_all.js
 
 ## 3. GitHub-এ নতুন রিলিজ ও আপডেট পাবলিশ করার সহজ ধাপ
 
-যখন আপনি নতুন কোনো ফিচার যুক্ত করবেন বা নতুন ভার্সন দিতে চাইবেন (যেমন `1.4.0` থেকে `1.5.0`):
+যখন আপনি নতুন কোনো ফিচার যুক্ত করবেন বা নতুন ভার্সন দিতে চাইবেন (যেমন `1.5.0` থেকে `1.5.1`):
 
 ### ধাপ ১: `version.json` ফাইল আপডেট
 [version.json](file:///d:/Panel/My-app/sm-remote-controller/version.json) ফাইলে ভার্সন নাম্বার ও চেঞ্জলগ সেট করুন:
 ```json
 {
-  "version": "1.5.0",
-  "versionCode": 6,
+  "version": "1.5.1",
+  "versionCode": 7,
   "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.0/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.1/SM_Remote_Controller.apk",
   "changelog": [
-    "🚀 পিউর মোবাইল-টু-মোবাইল রিমোট টাচ কন্ট্রোল",
-    "✨ পরিচ্ছন্ন ইন্টারফেস (টপ রাইট মেনু রিমুভড)",
-    "⚡ স্বয়ংক্রিয় ওয়ান-ক্লিক ইন-অ্যাপ আপডেট ইঞ্জিন"
+    "⚡ Dynamic real-time Device ID connection across any mobile phone",
+    "🔄 Real-time bidirectional touch, keyboard, and navigation sync",
+    "🗑️ Dynamic Recent Devices persistence (removed dummy devices, deletions stay deleted)",
+    "🆔 Deterministic stable 6-digit Device ID per physical device",
+    "📱 Real mobile model name detection & incoming connection alerts"
+  ]
+}
+```
   ]
 }
 ```

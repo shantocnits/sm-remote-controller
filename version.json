@@ -1,14 +1,14 @@
 {
-  "version": "1.5.0",
-  "versionCode": 6,
+  "version": "1.5.1",
+  "versionCode": 7,
   "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.0/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.1/SM_Remote_Controller.apk",
   "changelog": [
-    "🚀 Pure Mobile-to-Mobile remote touch controller",
-    "✨ Clean interface (removed top-right hamburger menu)",
-    "⚡ Fixed in-app auto-update loop and dynamic version sync",
-    "📱 Real-time 60 FPS mobile screen stream & touch coordinates",
-    "🛡️ Android system navigation bar (Back, Home, Recents)"
+    "⚡ Dynamic real-time Device ID connection across any mobile phone",
+    "🔄 Real-time bidirectional touch, keyboard, and navigation sync",
+    "🗑️ Dynamic Recent Devices persistence (removed dummy devices, deletions stay deleted)",
+    "🆔 Deterministic stable 6-digit Device ID per physical device",
+    "📱 Real mobile model name detection & incoming connection alerts"
   ]
 }

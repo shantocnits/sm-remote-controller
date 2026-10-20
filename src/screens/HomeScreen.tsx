@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,16 +17,39 @@ import { DeviceCard } from '../components/home/DeviceCard';
 import { DeviceActionModal } from '../components/home/DeviceActionModal';
 import { useAppStore } from '../store/useAppStore';
 import { Device } from '../types';
+import { peerService, PeerMessage } from '../services/peerService';
 
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const devices = useAppStore((state) => state.devices);
   const clearDevices = useAppStore((state) => state.clearDevices);
-  const setActiveTab = useAppStore((state) => state.setActiveTab);
-  const setConnectedDevice = useAppStore((state) => state.setConnectedDevice);
+  const connectToPartner = useAppStore((state) => state.connectToPartner);
+  const loadSavedDevices = useAppStore((state) => state.loadSavedDevices);
+  const setIncomingPartner = useAppStore((state) => state.setIncomingPartner);
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+
+  // Initialize peer service and load persistent devices on mount
+  useEffect(() => {
+    peerService.init();
+    loadSavedDevices();
+
+    const unsubscribe = peerService.addListener((msg: PeerMessage) => {
+      if (msg.type === 'CONNECT_REQUEST') {
+        setIncomingPartner({ id: msg.fromId, name: msg.fromName });
+        Alert.alert(
+          '📱 Incoming Remote Connection',
+          `${msg.fromName} (ID: ${msg.fromId}) is connecting to control your screen.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleOptions = (device: Device) => {
     setSelectedDevice(device);
@@ -34,8 +57,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleConnect = (device: Device) => {
-    setConnectedDevice(device);
-    setActiveTab('remote');
+    connectToPartner(device.code);
   };
 
   const handleClear = () => {
@@ -72,6 +94,16 @@ export const HomeScreen: React.FC = () => {
     [hasDevices]
   );
 
+  const renderEmptyList = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>📱</Text>
+      <Text style={styles.emptyTitle}>No Recent Devices</Text>
+      <Text style={styles.emptySub}>
+        Enter a 6-digit Partner ID in the card above to connect and control another mobile.
+      </Text>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top + 6, 14) }]}>
       <Header />
@@ -87,6 +119,7 @@ export const HomeScreen: React.FC = () => {
           />
         )}
         ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmptyList}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -126,5 +159,31 @@ const styles = StyleSheet.create({
   clearText: {
     color: Colors.textGray,
     fontWeight: '600',
+  },
+  emptyContainer: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    marginTop: 6,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 10,
+  },
+  emptyTitle: {
+    color: Colors.textWhite,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  emptySub: {
+    color: Colors.textGray,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
