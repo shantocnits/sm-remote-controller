@@ -9,9 +9,8 @@ import { UpdateModal } from './UpdateModal';
 import { checkForAppUpdates } from '../../services/updateService';
 
 export const Header: React.FC = () => {
-  const { toggleModeDropdown, isModeDropdownOpen, appVersion } = useAppStore();
+  const { appVersion, hasNewUpdate, setHasNewUpdate } = useAppStore();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [hasNewUpdate, setHasNewUpdate] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
 
   // Pulse animation for header badge
@@ -36,15 +35,13 @@ export const Header: React.FC = () => {
     );
     pulse.start();
 
-    // Check updates on startup
+    // Check updates on startup or when appVersion changes
     checkForAppUpdates(appVersion).then((info) => {
-      if (info.hasUpdate) {
-        setHasNewUpdate(true);
-      }
-    });
+      setHasNewUpdate(Boolean(info.hasUpdate));
+    }).catch(() => {});
 
     return () => pulse.stop();
-  }, [glowAnim, appVersion]);
+  }, [glowAnim, appVersion, setHasNewUpdate]);
 
   const handleOpenUpdate = () => {
     // Start continuous spin animation
@@ -80,7 +77,7 @@ export const Header: React.FC = () => {
       </View>
 
       <View style={styles.buttonsRow}>
-        {/* Update Button (Left of Menu) with animated spin */}
+        {/* Update Button (Only button on top right) */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleOpenUpdate}
@@ -89,18 +86,6 @@ export const Header: React.FC = () => {
             <VectorIcon name="update" size={18} color={Colors.brandGreen} />
           </Animated.View>
           {hasNewUpdate && <View style={styles.updateBadge} />}
-        </TouchableOpacity>
-
-        {/* Menu Button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={toggleModeDropdown}
-          style={[
-            styles.menuButton,
-            Shadows.neonGlow,
-            isModeDropdownOpen && styles.menuButtonActive,
-          ]}>
-          <VectorIcon name="bars" size={20} color={Colors.brandGreen} />
         </TouchableOpacity>
       </View>
 

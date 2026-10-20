@@ -18,7 +18,10 @@ foreach ($item in $toDelete) {
 $zip.Dispose()
 Write-Host "Cleared old META-INF signatures."
 
-$buildTools = "C:\Users\CNIT PC 01\AppData\Local\Android\Sdk\build-tools\34.0.0"
+$buildTools = "$env:LOCALAPPDATA\Android\Sdk\build-tools\34.0.0"
+if (-not (Test-Path $buildTools)) {
+    $buildTools = "C:\Users\Khandaker Shanto\AppData\Local\Android\Sdk\build-tools\34.0.0"
+}
 $zipalign = Join-Path $buildTools "zipalign.exe"
 $apksigner = Join-Path $buildTools "apksigner.bat"
 $jarsigner = "C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot\bin\jarsigner.exe"
@@ -45,5 +48,10 @@ Write-Host "v2/v3 signing completed with apksigner."
 & "$apksigner" verify -v $apkPath
 
 # 6. Copy to versioned apk
-Copy-Item $apkPath "apk\SM_Remote_Controller_v1.3.0.apk" -Force
-Write-Host "SUCCESS: APK completely verified and signed with v1, v2, and v3!"
+$version = "1.4.0"
+if (Test-Path "version.json") {
+    $vObj = Get-Content "version.json" -Raw | ConvertFrom-Json
+    if ($vObj.version) { $version = $vObj.version }
+}
+Copy-Item $apkPath "apk\SM_Remote_Controller_v$version.apk" -Force
+Write-Host "SUCCESS: APK completely verified and signed with v1, v2, and v3 as v$version!"

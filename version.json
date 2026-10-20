@@ -1,16 +1,14 @@
 {
-  "version": "1.4.0",
-  "versionCode": 5,
-  "releaseDate": "2026-10-01",
+  "version": "1.5.0",
+  "versionCode": 6,
+  "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.4.0/SM_Remote_Controller.apk",
-  "exeUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.4.0/SM_Remote_Controller.exe",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.0/SM_Remote_Controller.apk",
   "changelog": [
-    "🚀 WebRTC P2P Real-Time 60 FPS Screen Sharing (Ultra-low Latency)",
-    "📱 Automatic Real Device Name detection & display (Infinix, Windows PC, etc.)",
-    "⚡ Instant bidirectional P2P Handshake for remote touch & mouse control",
-    "🛡️ Infinity Mirror prevention with background broadcasting status overlay",
-    "🔒 Strict device validation and self-connection protection",
-    "⚡ Multi-CDN OTA update engine (GitHub Releases, jsDelivr & Raw)"
+    "🚀 Pure Mobile-to-Mobile remote touch controller",
+    "✨ Clean interface (removed top-right hamburger menu)",
+    "⚡ Fixed in-app auto-update loop and dynamic version sync",
+    "📱 Real-time 60 FPS mobile screen stream & touch coordinates",
+    "🛡️ Android system navigation bar (Back, Home, Recents)"
   ]
 }

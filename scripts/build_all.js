@@ -19,42 +19,25 @@ try {
 } catch (e) {
   console.warn('Could not read version.json, defaulting to 1.2.0');
 }
-const version = versionData.version || '1.2.0';
+const version = versionData.version || '1.4.0';
 console.log(`📌 Current Version: v${version}`);
 
-// 2. Embed HTML into Desktop C#
-console.log('\n📦 Step 1: Embedding Desktop HTML...');
+// 2. Bundle React Native JS Bundle
+console.log('\n📦 Step 0: Bundling React Native JavaScript & Assets for Android...');
 try {
-  require('./embed_html.js');
+  const assetsDir = path.join(rootDir, 'android', 'app', 'src', 'main', 'assets');
+  if (!fs.existsSync(assetsDir)) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+  }
+  const bundleCmd = 'npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res';
+  execSync(bundleCmd, { cwd: rootDir, stdio: 'inherit' });
+  console.log('✅ React Native Android bundle created successfully!');
 } catch (e) {
-  console.error('Error embedding HTML:', e);
+  console.warn('⚠️ Warning: react-native bundle command failed:', e.message);
 }
 
-// 3. Compile Desktop EXE
-console.log('\n🖥️ Step 2: Compiling Desktop EXE...');
-const cscPath = 'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe';
-const desktopProgram = path.join(rootDir, 'desktop-app', 'Program.cs');
-const iconPath = path.join(rootDir, 'desktop-app', 'app_icon.ico');
-const rootExePath = path.join(rootDir, 'SM_Remote_Controller.exe');
-const apkFolderExePath = path.join(apkOutputDir, 'SM_Remote_Controller.exe');
-const apkFolderExeVersionPath = path.join(apkOutputDir, `SM_Remote_Controller_v${version}.exe`);
-
-try {
-  const compileCmd = `& "${cscPath}" /target:winexe /out:"${rootExePath}" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.InteropServices.dll /win32icon:"${iconPath}" "${desktopProgram}"`;
-  execSync(`powershell -Command "${compileCmd}"`, { stdio: 'inherit' });
-  
-  // Copy to apk folder
-  fs.copyFileSync(rootExePath, apkFolderExePath);
-  fs.copyFileSync(rootExePath, apkFolderExeVersionPath);
-  console.log(`✅ Desktop EXE compiled & copied to:`);
-  console.log(`   - ${apkFolderExePath}`);
-  console.log(`   - ${apkFolderExeVersionPath}`);
-} catch (e) {
-  console.error('❌ Failed to compile desktop EXE:', e.message);
-}
-
-// 4. Copy Android APK
-console.log('\n📱 Step 3: Copying Android APK to apk folder...');
+// 2. Prepare Android APK
+console.log('\n📱 Step 1: Preparing Android APK for apk folder...');
 const debugApkSource = path.join(rootDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const releaseApkSource = path.join(rootDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 const apkSource = fs.existsSync(releaseApkSource) ? releaseApkSource : debugApkSource;
@@ -63,8 +46,13 @@ const apkVersionTarget = path.join(apkOutputDir, `SM_Remote_Controller_v${versio
 
 if (fs.existsSync(apkSource)) {
   fs.copyFileSync(apkSource, apkTarget);
-  // Sign APK targets
-  const apksignerPath = 'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\apksigner.bat';
+  const sdkCandidates = [
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    path.join(process.env.USERPROFILE || 'C:\\Users\\Khandaker Shanto', 'AppData', 'Local', 'Android', 'Sdk'),
+  ].filter(Boolean);
+  const sdkDir = sdkCandidates.find((dir) => fs.existsSync(dir)) || path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Android', 'Sdk');
+  const apksignerPath = path.join(sdkDir, 'build-tools', '34.0.0', 'apksigner.bat');
   const debugKeystore = path.join(rootDir, 'android', 'app', 'debug.keystore');
   if (fs.existsSync(apksignerPath) && fs.existsSync(debugKeystore)) {
     try {
@@ -75,8 +63,25 @@ if (fs.existsSync(apkSource)) {
 }
 
 if (fs.existsSync(apkTarget)) {
+  try {
+    require('./update_apk_bundle.js');
+  } catch (e) {
+    console.warn('Could not inject bundle:', e.message);
+  }
   fs.copyFileSync(apkTarget, apkVersionTarget);
-  console.log(`✅ Android APK ready in apk folder:`);
+
+  // Strict cleanup: ONLY main APK and current versioned APK remain in apk/ folder
+  const allowedFiles = new Set(['SM_Remote_Controller.apk', `SM_Remote_Controller_v${version}.apk`]);
+  const existingFiles = fs.readdirSync(apkOutputDir);
+  for (const file of existingFiles) {
+    if (!allowedFiles.has(file)) {
+      try {
+        fs.unlinkSync(path.join(apkOutputDir, file));
+      } catch (err) {}
+    }
+  }
+
+  console.log(`✅ Android APK ready in apk folder (clean 2 files only):`);
   console.log(`   - ${apkTarget}`);
   console.log(`   - ${apkVersionTarget}`);
 }

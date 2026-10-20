@@ -8,15 +8,12 @@ import { useAppStore } from '../../store/useAppStore';
 
 export const FloatingBottomNav: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { activeTab, setActiveTab, currentMode } = useAppStore();
+  const { activeTab, setActiveTab } = useAppStore();
 
   // If in chat, hide bottom nav like standard Messenger view
   if (activeTab === 'chat') {
     return null;
   }
-
-  // Dynamic Rule: If mode is NOT "Mobile to Mobile", hide Tools tab
-  const showToolsTab = currentMode === 'm2m';
 
   return (
     <View
@@ -33,18 +30,16 @@ export const FloatingBottomNav: React.FC = () => {
         />
         <NavButton
           label="Screen"
-          icon="desktop"
+          icon="mobile"
           isActive={activeTab === 'remote'}
           onPress={() => setActiveTab('remote')}
         />
-        {showToolsTab && (
-          <NavButton
-            label="Tools"
-            icon="tools"
-            isActive={activeTab === 'tools'}
-            onPress={() => setActiveTab('tools')}
-          />
-        )}
+        <NavButton
+          label="Tools"
+          icon="tools"
+          isActive={activeTab === 'tools'}
+          onPress={() => setActiveTab('tools')}
+        />
       </View>
     </View>
   );

@@ -18,7 +18,7 @@ export const OfflineNotice: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       const res = await fetch('https://clients3.google.com/generate_204', {
         signal: controller.signal,
-        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
       });
       clearTimeout(timeoutId);
       if (res.status === 204 || res.ok) {
@@ -55,7 +55,7 @@ export const OfflineNotice: React.FC = () => {
             ইন্টারনেট সংযোগ নেই!
           </Text>
 
-          <Text style={[Typography.bodySmall, styles.subtitle]}>
+          <Text style={[Typography.bodyRegular, styles.subtitle]}>
             আপনার ডিভাইসে নেট কানেকশন চেক করুন এবং পুনরায় চেষ্টা করুন।
           </Text>
 

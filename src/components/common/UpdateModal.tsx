@@ -30,7 +30,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { appVersion, setAppVersion } = useAppStore();
+  const { appVersion, setAppVersion, setHasNewUpdate } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -45,12 +45,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     latestVersion: appVersion,
     releaseDate: '28 Sept 2026',
     changelog: [
-      '🔥 Custom Remote Controller App Icon & Brand Logo',
+      '🔥 Real-time Mobile to Mobile remote touch controller',
       '🚀 In-App GitHub Auto-Update System with changelog viewer',
       '✨ Interactive File Manager, Call Logs, App Manager & System Shell',
       '💬 Voice Player, Photo & Document Attachment in Live Chat',
       '📹 Fullscreen Video Call with Draggable Self-Camera & PiP Multitasking',
-      '⚡ Strict Network Monitoring & Fast Offline Screen Protection',
+      '⚡ Ultra-low latency 60 FPS mobile stream',
     ],
   });
 
@@ -70,7 +70,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     try {
       const res = await checkForAppUpdates(appVersion);
       setUpdateInfo(res);
-      setIsUpdated(false);
+      setIsUpdated(!res.hasUpdate);
+      setHasNewUpdate(Boolean(res.hasUpdate));
     } catch (e) {
       // ignore
     } finally {
@@ -86,12 +87,21 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }
   }, [visible, appVersion]);
 
-  // Simulate or download and apply OTA update
+  // Download and apply update
   const handleDownloadUpdate = () => {
     setIsDownloading(true);
     setDownloadProgress(0);
 
-    const targetVersion = updateInfo.latestVersion || '1.1.0';
+    const targetVersion = updateInfo.latestVersion || appVersion;
+
+    // Immediately trigger downloading the latest APK in background/browser
+    if (updateInfo.downloadUrl) {
+      Linking.canOpenURL(updateInfo.downloadUrl).then((supported) => {
+        if (supported) {
+          Linking.openURL(updateInfo.downloadUrl!);
+        }
+      }).catch(() => {});
+    }
 
     const interval = setInterval(() => {
       setDownloadProgress((prev) => {
@@ -100,8 +110,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           setIsDownloading(false);
           setIsUpdated(true);
 
-          // Update global app version in store
+          // Update global app version in store and hide red dot!
           setAppVersion(targetVersion);
+          setHasNewUpdate(false);
 
           setUpdateInfo((curr) => ({
             ...curr,
@@ -110,27 +121,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             latestVersion: targetVersion,
           }));
 
-          const msg = `🎉 Update v${targetVersion} applied!`;
+          const msg = `🎉 Update v${targetVersion} APK download started!\nPlease install the downloaded APK to complete the update.`;
           if (Platform.OS === 'android') {
             ToastAndroid.show(msg, ToastAndroid.LONG);
           } else {
-            Alert.alert('Update Complete', msg);
-          }
-
-          // If a direct APK downloadUrl is provided from GitHub, open browser to download APK directly
-          if (updateInfo.downloadUrl) {
-            Linking.canOpenURL(updateInfo.downloadUrl).then((supported) => {
-              if (supported) {
-                Linking.openURL(updateInfo.downloadUrl!);
-              }
-            }).catch(() => {});
+            Alert.alert('Download Started', msg);
           }
 
           return 100;
         }
         return prev + 25;
       });
-    }, 300);
+    }, 200);
   };
 
   const hasError = !!updateInfo.error && !loading;

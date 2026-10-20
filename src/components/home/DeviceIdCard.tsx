@@ -9,7 +9,6 @@ import { formatCurrentDate, formatCurrentTime } from '../../utils/dateUtils';
 import { getDeviceId, copyTextToClipboard } from '../../utils/deviceUtils';
 
 export const DeviceIdCard: React.FC = () => {
-  const { currentMode } = useAppStore();
   const [deviceId] = useState<string>(getDeviceId());
   const [liveDate, setLiveDate] = useState(formatCurrentDate());
   const [liveTime, setLiveTime] = useState(formatCurrentTime());
@@ -26,7 +25,7 @@ export const DeviceIdCard: React.FC = () => {
     copyTextToClipboard(deviceId, 'Device ID');
   };
 
-  const modeLabel = currentMode === 'm2m' ? 'Mobile Mode' : 'Desktop Mode';
+  const modeLabel = 'Mobile Mode';
 
   return (
     <View style={styles.card}>

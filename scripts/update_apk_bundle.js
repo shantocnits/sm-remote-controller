@@ -3,13 +3,37 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
-const aaptPath = 'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\aapt.exe';
-const apksignerPath = 'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\apksigner.bat';
+const userProfile = process.env.USERPROFILE || 'C:\\Users\\Khandaker Shanto';
+const sdkCandidates = [
+  process.env.ANDROID_HOME,
+  process.env.ANDROID_SDK_ROOT,
+  path.join(userProfile, 'AppData', 'Local', 'Android', 'Sdk'),
+  'C:\\Users\\Khandaker Shanto\\AppData\\Local\\Android\\Sdk',
+  'C:\\Users\\CNIT PC 01\\AppData\\Local\\Android\\Sdk',
+].filter(Boolean);
+
+let sdkDir = sdkCandidates.find((dir) => fs.existsSync(dir)) || path.join(userProfile, 'AppData', 'Local', 'Android', 'Sdk');
+const buildToolsDir = path.join(sdkDir, 'build-tools');
+let toolVer = '34.0.0';
+if (fs.existsSync(buildToolsDir)) {
+  const vers = fs.readdirSync(buildToolsDir).filter((v) => fs.existsSync(path.join(buildToolsDir, v, 'aapt.exe')));
+  if (vers.length > 0) toolVer = vers[vers.length - 1];
+}
+
+const aaptPath = path.join(buildToolsDir, toolVer, 'aapt.exe');
+const apksignerPath = path.join(buildToolsDir, toolVer, 'apksigner.bat');
 const debugKeystore = path.join(rootDir, 'android', 'app', 'debug.keystore');
+
+const versionJsonPath = path.join(rootDir, 'version.json');
+let version = '1.4.0';
+try {
+  const versionData = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+  if (versionData.version) version = versionData.version;
+} catch (e) {}
 
 const bundleSource = path.join(rootDir, 'android', 'app', 'src', 'main', 'assets', 'index.android.bundle');
 const targetApk = path.join(rootDir, 'apk', 'SM_Remote_Controller.apk');
-const targetVersionApk = path.join(rootDir, 'apk', 'SM_Remote_Controller_v1.3.0.apk');
+const targetVersionApk = path.join(rootDir, 'apk', `SM_Remote_Controller_v${version}.apk`);
 
 if (!fs.existsSync(bundleSource)) {
   console.error('❌ Bundle source not found:', bundleSource);

@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { ActiveTab, AppMode, AudioCallStatus, ChatMessage, Device, VideoCallStatus } from '../types';
+import versionConfig from '../../version.json';
+
+const CURRENT_VERSION = versionConfig.version || '1.4.0';
 
 interface AppStoreState {
   // Mode & Navigation
@@ -28,7 +31,9 @@ interface AppStoreState {
 
   // App Version & Updates
   appVersion: string;
+  hasNewUpdate: boolean;
   setAppVersion: (ver: string) => void;
+  setHasNewUpdate: (val: boolean) => void;
 
   // Actions
   setMode: (mode: AppMode) => void;
@@ -81,9 +86,9 @@ const initialDevices: Device[] = [
   },
   {
     id: '2',
-    name: "Shanto's PC",
+    name: 'Pixel 8 Pro',
     code: '882 109',
-    type: 'desktop',
+    type: 'mobile',
     isPinned: false,
   },
 ];
@@ -105,7 +110,7 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export const useAppStore = create<AppStoreState>((set, get) => ({
-  // Mode & Navigation
+  // Mode & Navigation - strictly Mobile to Mobile
   currentMode: 'm2m',
   activeTab: 'home',
   isModeDropdownOpen: false,
@@ -128,13 +133,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   isVoiceRecording: false,
   voiceSeconds: 0,
 
-  // Mode selection: dynamic tab hiding logic
+  // Mode selection
   setMode: (mode: AppMode) => {
-    const currentTab = get().activeTab;
-    const newTab = mode !== 'm2m' && currentTab === 'tools' ? 'home' : currentTab;
     set({
-      currentMode: mode,
-      activeTab: newTab,
+      currentMode: 'm2m',
       isModeDropdownOpen: false,
     });
   },
@@ -143,10 +145,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   toggleModeDropdown: () =>
     set((state) => ({ isModeDropdownOpen: !state.isModeDropdownOpen })),
+  closeModeDropdown: () => set({ isModeDropdownOpen: false }),
 
-  // App Version
-  appVersion: '1.3.0',
+  // App Version & Updates
+  appVersion: CURRENT_VERSION,
+  hasNewUpdate: false,
   setAppVersion: (ver: string) => set({ appVersion: ver }),
+  setHasNewUpdate: (val: boolean) => set({ hasNewUpdate: val }),
 
   setPartnerIdInput: (val: string) => set({ partnerIdInput: val }),
 
@@ -173,20 +178,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return existing;
     }
 
-    const currentMode = get().currentMode;
-    const resolvedType: 'mobile' | 'desktop' =
-      type || (currentMode === 'm2m' ? 'mobile' : 'desktop');
-
-    const defaultName =
-      resolvedType === 'desktop'
-        ? `Desktop PC (${formattedCode})`
-        : `Galaxy Phone (${formattedCode})`;
+    const defaultName = `Galaxy Phone (${formattedCode})`;
 
     const newDevice: Device = {
       id: `dev-${Date.now()}`,
       name: customName || defaultName,
       code: formattedCode,
-      type: resolvedType,
+      type: 'mobile',
       isPinned: false,
     };
 

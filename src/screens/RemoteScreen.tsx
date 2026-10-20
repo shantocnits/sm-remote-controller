@@ -28,32 +28,24 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export const RemoteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const connectedDevice = useAppStore((state) => state.connectedDevice);
-  const currentMode = useAppStore((state) => state.currentMode);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
 
-  const isDesktop =
-    connectedDevice?.type === 'desktop' ||
-    currentMode === 'm2d' ||
-    currentMode === 'd2d';
-
-  const partnerName =
-    connectedDevice?.name ||
-    (isDesktop ? "Shanto's PC" : 'Galaxy S23 Ultra');
+  const partnerName = connectedDevice?.name || 'Galaxy S23 Ultra';
   const partnerCode = connectedDevice?.code || '948 201';
 
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(1);
 
-  // Live remote cursor position
+  // Live remote touch position
   const [cursorPos, setCursorPos] = useState({ x: 190, y: 260 });
   const [touchActive, setTouchActive] = useState(false);
 
   // Command history on remote screen
   const [commandLogs, setCommandLogs] = useState<string[]>([
-    '> P2P Screen Connection Established [Direct PeerJS]',
-    `> Host Device: ${partnerName} (ID: ${partnerCode})`,
-    '> Display: 1920x1080 Ultra HD @ 60 FPS',
-    '> Input System: Keyboard & Remote Mouse Active',
+    '> Mobile-to-Mobile Screen Connected [WebRTC P2P]',
+    `> Remote Device: ${partnerName} (ID: ${partnerCode})`,
+    '> Display: Live Mobile Screen @ 60 FPS',
+    '> Input System: Real-time Touch & Keyboard Active',
   ]);
 
   // 1. Video Recording State
@@ -148,12 +140,15 @@ export const RemoteScreen: React.FC = () => {
     setActiveTab('home');
   };
 
-  // Touch handler to simulate remote mouse pointer move
+  // Touch handler to simulate remote touch move & tap
   const handleTouchScreen = (e: any) => {
     const { locationX, locationY } = e.nativeEvent;
     if (locationX && locationY) {
-      setCursorPos({ x: Math.round(locationX), y: Math.round(locationY) });
+      const x = Math.round(locationX);
+      const y = Math.round(locationY);
+      setCursorPos({ x, y });
       setTouchActive(true);
+      showToast(`👆 Remote Touch at (${x}, ${y})`, 'info');
       setTimeout(() => setTouchActive(false), 800);
     }
   };
@@ -295,7 +290,7 @@ export const RemoteScreen: React.FC = () => {
         <View style={styles.partnerInfoPill}>
           <LivePulseBadge color={Colors.dangerRed} size={8} />
           <VectorIcon
-            name={isDesktop ? 'desktop' : 'mobile'}
+            name="mobile"
             size={14}
             color={Colors.brandGreen}
           />
@@ -343,137 +338,59 @@ export const RemoteScreen: React.FC = () => {
         onPress={handleTouchScreen}
         style={styles.screenViewport}>
         
-        {isDesktop ? (
-          // ================= REAL DESKTOP OS INTERFACE =================
-          <View style={styles.desktopOSContainer}>
-            {/* Real Desktop Stream Frame */}
-            <View style={styles.desktopWallpaper}>
-              {/* Live Stream Banner */}
-              <View style={styles.liveStreamBanner}>
-                <View style={styles.liveStreamDot} />
-                <Text style={styles.liveStreamText}>
-                  LIVE REAL DESKTOP • 1920x1080 @ 60 FPS
-                </Text>
-              </View>
-
-              {/* Minimized Background Streaming Info */}
-              <View style={styles.backgroundStreamNotice}>
-                <VectorIcon name="share" size={14} color={Colors.brandGreen} />
-                <Text style={styles.backgroundStreamNoticeText}>
-                  Background Active: Stream continues when PC app is minimized
-                </Text>
-              </View>
+        {/* ================= REAL MOBILE OS INTERFACE ================= */}
+        <View style={styles.mobileOSContainer}>
+          {/* Phone Stream Frame */}
+          <View style={styles.mobileStreamFrame}>
+            {/* Live Stream Banner */}
+            <View style={styles.liveStreamBanner}>
+              <View style={styles.liveStreamDot} />
+              <Text style={styles.liveStreamText}>
+                LIVE REAL MOBILE SCREEN • 60 FPS
+              </Text>
             </View>
 
-            {/* Simulated Remote Mouse Pointer */}
-            <View
-              pointerEvents="none"
-              style={[
-                styles.virtualCursor,
-                {
-                  left: Math.max(10, Math.min(cursorPos.x - 8, SCREEN_WIDTH - 40)),
-                  top: Math.max(10, cursorPos.y - 12),
-                },
-              ]}>
-              <VectorIcon name="arrow-right" size={22} color={Colors.brandGreen} />
-              {touchActive && (
-                <View style={styles.cursorCoordinates}>
-                  <Text style={styles.cursorCoordinatesText}>
-                    {cursorPos.x}, {cursorPos.y}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Remote Desktop Action Bar (Quick Windows Keys & Clicks) */}
-            <View style={styles.desktopQuickActionBar}>
-              <TouchableOpacity
-                onPress={() => handleSendKey('Win')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>⊞ Win</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showToast(`🖱️ Left Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>L-Click</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showToast(`🖱️ Right Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>R-Click</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showToast(`🖱️ Double Click at (${cursorPos.x}, ${cursorPos.y})`, 'success')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>2x Click</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleSendKey('Esc')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>Esc</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleSendKey('Enter')}
-                style={styles.quickKeyBtn}>
-                <Text style={styles.quickKeyBtnText}>Enter ↵</Text>
-              </TouchableOpacity>
+            {/* Minimized Background Streaming Info */}
+            <View style={styles.backgroundStreamNotice}>
+              <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
+              <Text style={styles.backgroundStreamNoticeText}>
+                Touch Active: Real screen streaming & remote touch enabled
+              </Text>
             </View>
           </View>
-        ) : (
-          // ================= REAL MOBILE OS INTERFACE =================
-          <View style={styles.mobileOSContainer}>
-            {/* Phone Stream Frame */}
-            <View style={styles.mobileStreamFrame}>
-              {/* Live Stream Banner */}
-              <View style={styles.liveStreamBanner}>
-                <View style={styles.liveStreamDot} />
-                <Text style={styles.liveStreamText}>
-                  LIVE REAL MOBILE SCREEN • 60 FPS
-                </Text>
-              </View>
 
-              {/* Minimized Background Streaming Info */}
-              <View style={styles.backgroundStreamNotice}>
-                <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
-                <Text style={styles.backgroundStreamNoticeText}>
-                  Touch Active: Real screen streaming even when minimized
-                </Text>
-              </View>
-            </View>
-
-            {/* Virtual Touch Ripple Pointer */}
-            <View
-              pointerEvents="none"
-              style={[
-                styles.virtualTouchDot,
-                {
-                  left: Math.max(10, cursorPos.x - 16),
-                  top: Math.max(10, cursorPos.y - 16),
-                },
-              ]}>
-              <View style={styles.touchRippleInner} />
-            </View>
-
-            {/* Android System Navigation Bar (Back, Home, Recents) */}
-            <View style={styles.androidNavBar}>
-              <TouchableOpacity
-                onPress={() => showToast('◁ Back navigation sent to device', 'info')}
-                style={styles.navBarBtn}>
-                <Text style={styles.navBarBtnText}>◁</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showToast('○ Home navigation sent to device', 'info')}
-                style={styles.navBarBtn}>
-                <Text style={styles.navBarBtnText}>○</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showToast('▢ Recents navigation sent to device', 'info')}
-                style={styles.navBarBtn}>
-                <Text style={styles.navBarBtnText}>▢</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Virtual Touch Ripple Pointer */}
+          <View
+            pointerEvents="none"
+            style={[
+              styles.virtualTouchDot,
+              {
+                left: Math.max(10, cursorPos.x - 16),
+                top: Math.max(10, cursorPos.y - 16),
+              },
+            ]}>
+            <View style={styles.touchRippleInner} />
           </View>
-        )}
+
+          {/* Android System Navigation Bar (Back, Home, Recents) */}
+          <View style={styles.androidNavBar}>
+            <TouchableOpacity
+              onPress={() => showToast('◁ Back navigation sent to device', 'info')}
+              style={styles.navBarBtn}>
+              <Text style={styles.navBarBtnText}>◁</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => showToast('○ Home navigation sent to device', 'info')}
+              style={styles.navBarBtn}>
+              <Text style={styles.navBarBtnText}>○</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => showToast('▢ Recents navigation sent to device', 'info')}
+              style={styles.navBarBtn}>
+              <Text style={styles.navBarBtnText}>▢</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </TouchableOpacity>
 
       {/* Floating Action Toolbar */}

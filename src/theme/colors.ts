@@ -26,6 +26,8 @@ export const Colors = {
   dangerRed: '#ef4444',
   dangerRedSoft: 'rgba(239, 68, 68, 0.15)',
   dangerRedGlow: 'rgba(239, 68, 68, 0.5)',
+  warningOrange: '#f59e0b',
+  neonCyan: '#22d3ee',
   successGreen: '#10b981',
   audioBannerBg: '#162a26',
   audioBannerBorder: 'rgba(45, 212, 191, 0.2)',

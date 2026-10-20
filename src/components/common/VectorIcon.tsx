@@ -42,7 +42,9 @@ export type IconName =
   | 'close'
   | 'update'
   | 'check'
-  | 'download';
+  | 'download'
+  | 'alert'
+  | 'wifi-off';
 
 interface VectorIconProps {
   name: IconName;
@@ -53,7 +55,7 @@ interface VectorIconProps {
 
 export const VectorIcon: React.FC<VectorIconProps> = ({
   name,
-  size = 18,
+  size = 20,
   color = '#ffffff',
   style,
 }) => {
@@ -68,9 +70,9 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
       case 'laptop':
         return <FontAwesome6 name="laptop" size={size} color={color} style={style} />;
       case 'copy':
-        return <FontAwesome6 name="copy" regular size={size} color={color} style={style} />;
+        return <FontAwesome6 name="copy" size={size} color={color} style={style} />;
       case 'keyboard':
-        return <FontAwesome6 name="keyboard" regular size={size} color={color} style={style} />;
+        return <FontAwesome6 name="keyboard" size={size} color={color} style={style} />;
       case 'arrow-right':
         return <FontAwesome6 name="arrow-right" size={size} color={color} style={style} />;
       case 'thumbtack':
@@ -78,7 +80,7 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
       case 'ellipsis-v':
         return <FontAwesome6 name="ellipsis-vertical" size={size} color={color} style={style} />;
       case 'trash':
-        return <FontAwesome6 name="trash-can" regular size={size} color={color} style={style} />;
+        return <FontAwesome6 name="trash-can" size={size} color={color} style={style} />;
       case 'camera':
         return <FontAwesome6 name="camera" size={size} color={color} style={style} />;
       case 'microphone':
@@ -120,7 +122,7 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
       case 'plus':
         return <FontAwesome6 name="plus" size={size} color={color} style={style} />;
       case 'image':
-        return <FontAwesome6 name="image" regular size={size} color={color} style={style} />;
+        return <FontAwesome6 name="image" size={size} color={color} style={style} />;
       case 'paper-plane':
         return <FontAwesome6 name="paper-plane" size={size} color={color} style={style} />;
       case 'check-double':
@@ -139,6 +141,10 @@ export const VectorIcon: React.FC<VectorIconProps> = ({
         return <FontAwesome6 name="cloud-arrow-down" size={size} color={color} style={style} />;
       case 'check':
         return <FontAwesome6 name="check" size={size} color={color} style={style} />;
+      case 'alert':
+        return <FontAwesome6 name="triangle-exclamation" size={size} color={color} style={style} />;
+      case 'wifi-off':
+        return <FontAwesome6 name="wifi" size={size} color={color} style={style} />;
       default:
         return <FontAwesome6 name="circle-info" size={size} color={color} style={style} />;
     }

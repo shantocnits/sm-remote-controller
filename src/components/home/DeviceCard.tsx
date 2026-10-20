@@ -32,9 +32,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         {/* Device Icon Avatar */}
         <View style={styles.avatar}>
           <VectorIcon
-            name={device.type === 'mobile' ? 'mobile' : 'desktop'}
+            name="mobile"
             size={22}
-            color={device.type === 'mobile' ? Colors.brandGreen : Colors.textGray}
+            color={Colors.brandGreen}
           />
         </View>
 
