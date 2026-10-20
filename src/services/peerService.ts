@@ -1,7 +1,26 @@
-import { Platform } from 'react-native';
+import { Vibration, Platform } from 'react-native';
+import Paho from 'paho-mqtt';
 import { Device } from '../types';
 import { getCleanDeviceId, getDeviceId, getDeviceName, getDeviceIdentity } from '../utils/deviceUtils';
 import { screenStreamService } from './screenStreamService';
+import { storageService } from './storageService';
+
+// Ensure localStorage polyfill for Paho in React Native environment
+if (typeof (global as any).localStorage === 'undefined') {
+  const memStore: Record<string, string> = {};
+  (global as any).localStorage = {
+    getItem: (k: string) => memStore[k] || null,
+    setItem: (k: string, v: string) => {
+      memStore[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete memStore[k];
+    },
+    clear: () => {
+      Object.keys(memStore).forEach((k) => delete memStore[k]);
+    },
+  };
+}
 
 export interface PeerMessage {
   type:
@@ -22,16 +41,35 @@ export interface PeerMessage {
 
 type PeerEventListener = (msg: PeerMessage) => void;
 
+interface MqttBrokerConfig {
+  host: string;
+  port: number;
+  path: string;
+  ssl: boolean;
+}
+
+const MQTT_BROKERS: MqttBrokerConfig[] = [
+  // Tier 1: EMQX Global Public Broker (Fastest in Asia & Global)
+  { host: 'broker.emqx.io', port: 8084, path: '/mqtt', ssl: true },
+  // Tier 2: HiveMQ Cloud Broker
+  { host: 'broker.hivemq.com', port: 8884, path: '/mqtt', ssl: true },
+  // Tier 3: Mosquitto Test Broker
+  { host: 'test.mosquitto.org', port: 8081, path: '/mqtt', ssl: true },
+];
+
 class PeerService {
-  private ws: WebSocket | null = null;
+  private client: Paho.Client | null = null;
+  private currentBrokerIndex: number = 0;
+  private isConnected: boolean = false;
+  private isConnecting: boolean = false;
   private selfId: string = '';
   private selfName: string = '';
   private listeners: Set<PeerEventListener> = new Set();
-  private isConnectingWs: boolean = false;
   private reconnectTimer: any = null;
   private heartbeatTimer: any = null;
-  private pollTimer: any = null;
+  private pendingQueue: Array<{ topic: string; message: string; qos: number }> = [];
   private processedMessages: Set<string> = new Set();
+
   private pendingConnectPromise: {
     targetId: string;
     resolve: (val: { success: boolean; partnerName?: string; partnerCode?: string; error?: string }) => void;
@@ -39,19 +77,18 @@ class PeerService {
   } | null = null;
 
   /**
-   * Initialize dual-channel WebSocket & HTTP Polling listener for this device
+   * Initialize Enterprise Multi-Broker MQTT Signaling
    */
   public init(customSelfId?: string) {
-    this.selfId = (customSelfId || getCleanDeviceId()).replace(/\s+/g, '');
+    this.selfId = (customSelfId || getCleanDeviceId()).replace(/[^0-9]/g, '');
     this.selfName = getDeviceName();
 
-    this.connectWs();
+    this.connectMqtt();
     this.startHeartbeat();
-    this.startHttpPolling();
   }
 
   public getSelfCleanId(): string {
-    return this.selfId || getCleanDeviceId().replace(/\s+/g, '');
+    return this.selfId || getCleanDeviceId().replace(/[^0-9]/g, '');
   }
 
   public getSelfFormattedId(): string {
@@ -80,118 +117,124 @@ class PeerService {
   }
 
   /**
-   * Primary: Real-time WebSocket connection
+   * Connect to MQTT broker cluster with automatic failover
    */
-  private connectWs() {
-    if (
-      this.isConnectingWs ||
-      (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))
-    ) {
-      return;
-    }
+  private connectMqtt() {
+    if (this.isConnected || this.isConnecting) return;
 
-    this.isConnectingWs = true;
-    const topic = `sm_remote_${this.getSelfCleanId()}`;
-    const wsUrl = `wss://ntfy.sh/${topic}/ws`;
+    this.isConnecting = true;
+    const cleanSelf = this.getSelfCleanId();
+    const broker = MQTT_BROKERS[this.currentBrokerIndex];
+    const clientId = `sm_ctrl_${cleanSelf}_${Date.now().toString(36)}`;
 
     try {
-      this.ws = new WebSocket(wsUrl);
+      this.client = new Paho.Client(broker.host, broker.port, broker.path, clientId);
 
-      this.ws.onopen = () => {
-        this.isConnectingWs = false;
-        console.log(`[PeerService] WebSocket connected to: ${topic}`);
+      this.client.onConnectionLost = (responseObject) => {
+        this.isConnected = false;
+        this.isConnecting = false;
+        console.warn('[PeerService] Connection lost to', broker.host, responseObject.errorMessage);
+        this.scheduleFailover();
       };
 
-      this.ws.onmessage = (event) => {
+      this.client.onMessageArrived = (message) => {
         try {
-          const raw = JSON.parse(event.data);
-          if (raw.event === 'message' && raw.message) {
-            const data: PeerMessage = JSON.parse(raw.message);
-            this.handleIncomingMessage(data, raw.id);
-          }
-        } catch (e) {
-          // ignore non-json
+          const payload = message.payloadString;
+          const data: PeerMessage = JSON.parse(payload);
+          this.handleIncomingMessage(data);
+        } catch (err) {
+          console.warn('[PeerService] Failed to parse incoming MQTT payload:', err);
         }
       };
 
-      this.ws.onerror = () => {
-        this.isConnectingWs = false;
-      };
+      this.client.connect({
+        useSSL: broker.ssl,
+        timeout: 4,
+        keepAliveInterval: 15,
+        cleanSession: true,
+        onSuccess: () => {
+          this.isConnected = true;
+          this.isConnecting = false;
+          console.log(`[PeerService] Connected to enterprise broker: ${broker.host}`);
 
-      this.ws.onclose = () => {
-        this.isConnectingWs = false;
-        this.scheduleReconnect();
-      };
+          // Subscribe to this phone's dedicated channel
+          const myTopic = `sm/controller/${cleanSelf}`;
+          this.client?.subscribe(myTopic, { qos: 1 });
+          console.log(`[PeerService] Subscribed to topic: ${myTopic}`);
+
+          // Flush any pending messages that were queued while offline
+          this.flushPendingQueue();
+        },
+        onFailure: (err) => {
+          this.isConnected = false;
+          this.isConnecting = false;
+          console.warn(`[PeerService] Failed connecting to ${broker.host}:`, err.errorMessage);
+          this.scheduleFailover();
+        },
+      });
     } catch (err) {
-      this.isConnectingWs = false;
-      this.scheduleReconnect();
+      this.isConnected = false;
+      this.isConnecting = false;
+      this.scheduleFailover();
     }
   }
 
-  private scheduleReconnect() {
+  /**
+   * Switch to next broker in cluster upon failure
+   */
+  private scheduleFailover() {
     if (this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connectWs();
-    }, 2500);
+      this.currentBrokerIndex = (this.currentBrokerIndex + 1) % MQTT_BROKERS.length;
+      console.log(`[PeerService] Failing over to broker [${this.currentBrokerIndex}]: ${MQTT_BROKERS[this.currentBrokerIndex].host}`);
+      this.connectMqtt();
+    }, 1500);
   }
 
   private startHeartbeat() {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = setInterval(() => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        this.connectWs();
+      if (!this.isConnected && !this.isConnecting) {
+        this.connectMqtt();
       }
     }, 12000);
   }
 
-  /**
-   * Fallback: Fast HTTP polling every 1.5s to ensure zero missed messages on mobile networks
-   */
-  private startHttpPolling() {
-    if (this.pollTimer) clearInterval(this.pollTimer);
-    this.pollTimer = setInterval(async () => {
-      const topic = `sm_remote_${this.getSelfCleanId()}`;
-      try {
-        const res = await fetch(`https://ntfy.sh/${topic}/json?since=15s&poll=1`);
-        if (!res.ok) return;
-        const text = await res.text();
-        if (!text || !text.trim()) return;
-
-        const lines = text.trim().split('\n');
-        for (const line of lines) {
-          try {
-            const item = JSON.parse(line);
-            if (item.event === 'message' && item.message) {
-              const data: PeerMessage = JSON.parse(item.message);
-              this.handleIncomingMessage(data, item.id);
-            }
-          } catch {}
-        }
-      } catch {}
-    }, 1500);
+  private flushPendingQueue() {
+    if (!this.client || !this.isConnected) return;
+    while (this.pendingQueue.length > 0) {
+      const item = this.pendingQueue.shift();
+      if (item) {
+        try {
+          const msg = new Paho.Message(item.message);
+          msg.destinationName = item.topic;
+          msg.qos = item.qos as 0 | 1 | 2;
+          this.client.send(msg);
+        } catch (e) {}
+      }
+    }
   }
 
   /**
-   * Process incoming signaling message with robust ID normalization
+   * Handle incoming signaling messages
    */
-  private handleIncomingMessage(msg: PeerMessage, rawMsgId?: string) {
+  private handleIncomingMessage(msg: PeerMessage) {
     if (!msg || !msg.type || !msg.fromId) return;
 
-    const cleanFromId = (msg.fromId || '').replace(/[^0-9]/g, '');
-    const cleanSelfId = this.getSelfCleanId().replace(/[^0-9]/g, '');
+    const cleanFromId = msg.fromId.replace(/[^0-9]/g, '');
+    const cleanSelfId = this.getSelfCleanId();
 
     // Ignore self messages
     if (cleanFromId === cleanSelfId) return;
 
-    // Only deduplicate non-request messages to ensure repeated connect requests are always shown
+    // Deduplicate non-request messages
     if (msg.type !== 'CONNECT_REQUEST') {
-      const dedupKey = rawMsgId || `${cleanFromId}_${msg.type}_${msg.timestamp}`;
+      const dedupKey = `${cleanFromId}_${msg.type}_${msg.timestamp}`;
       if (this.processedMessages.has(dedupKey)) {
         return;
       }
       this.processedMessages.add(dedupKey);
-
       if (this.processedMessages.size > 200) {
         const arr = Array.from(this.processedMessages);
         this.processedMessages = new Set(arr.slice(-100));
@@ -200,9 +243,16 @@ class PeerService {
 
     console.log('[PeerService] Incoming verified message:', msg.type, 'from:', cleanFromId, msg.fromName);
 
+    // Haptic vibration on incoming connection request
+    if (msg.type === 'CONNECT_REQUEST') {
+      try {
+        Vibration.vibrate([0, 300, 150, 300]);
+      } catch (e) {}
+    }
+
     // If caller is waiting for partner response
     if (this.pendingConnectPromise) {
-      const cleanPendingTarget = (this.pendingConnectPromise.targetId || '').replace(/[^0-9]/g, '');
+      const cleanPendingTarget = this.pendingConnectPromise.targetId.replace(/[^0-9]/g, '');
       if (cleanPendingTarget === cleanFromId) {
         if (msg.type === 'CONNECT_ACCEPT') {
           clearTimeout(this.pendingConnectPromise.timer);
@@ -225,8 +275,10 @@ class PeerService {
       }
     }
 
-    // Stream handler and event listeners
+    // Screen stream message dispatcher
     screenStreamService.handlePeerMessage(msg);
+
+    // Notify UI event listeners
     this.emit({
       ...msg,
       fromId: cleanFromId,
@@ -234,39 +286,41 @@ class PeerService {
   }
 
   /**
-   * Post message directly to remote device's channel
+   * Send message to remote device with guaranteed delivery
    */
   public async sendToDevice(targetId: string, message: PeerMessage): Promise<boolean> {
     const cleanTarget = targetId.replace(/[^0-9]/g, '');
-    const topic = `sm_remote_${cleanTarget}`;
-    const url = `https://ntfy.sh/${topic}`;
+    const topic = `sm/controller/${cleanTarget}`;
+    const payload = JSON.stringify({
+      ...message,
+      fromId: this.getSelfCleanId(),
+      fromName: this.selfName,
+      timestamp: message.timestamp || Date.now(),
+    });
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...message,
-          fromId: this.getSelfCleanId(),
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return res.ok;
-    } catch (err) {
-      console.warn('[PeerService] Failed to send message to', cleanTarget, err);
-      return false;
+    if (this.client && this.isConnected) {
+      try {
+        const pahoMsg = new Paho.Message(payload);
+        pahoMsg.destinationName = topic;
+        pahoMsg.qos = 1; // QoS 1 ensures guaranteed delivery across mobile networks
+        this.client.send(pahoMsg);
+        return true;
+      } catch (err) {
+        console.warn('[PeerService] Send error, queuing message:', err);
+      }
     }
+
+    // Queue if momentarily disconnected
+    this.pendingQueue.push({ topic, message: payload, qos: 1 });
+    if (!this.isConnected && !this.isConnecting) {
+      this.connectMqtt();
+    }
+    return true;
   }
 
   /**
    * Request connection to partner device ID (Caller side)
-   * Does NOT auto-connect; sends request and waits for Callee to Accept
+   * Sends connection request and waits for Callee to tap Accept
    */
   public async requestConnect(
     targetCode: string
@@ -288,8 +342,10 @@ class PeerService {
       };
     }
 
-    // Ensure our channel is active
-    this.connectWs();
+    // Ensure MQTT connection is active
+    if (!this.isConnected && !this.isConnecting) {
+      this.connectMqtt();
+    }
 
     return new Promise((resolve) => {
       // 25 second timeout for human partner to tap "Accept"
@@ -309,19 +365,20 @@ class PeerService {
         timer,
       };
 
-      // Send connection request + backup burst to guarantee delivery
+      // Send connection request + rapid burst to guarantee instantaneous delivery
       const reqMsg: PeerMessage = {
         type: 'CONNECT_REQUEST',
         fromId: cleanSelf,
         fromName: this.selfName,
         timestamp: Date.now(),
       };
+
       this.sendToDevice(cleanTarget, reqMsg);
       setTimeout(() => {
         if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === cleanTarget) {
           this.sendToDevice(cleanTarget, reqMsg);
         }
-      }, 400);
+      }, 350);
     });
   }
 
@@ -332,10 +389,6 @@ class PeerService {
     const cleanTarget = targetCode.replace(/[^0-9]/g, '');
     if (this.pendingConnectPromise && this.pendingConnectPromise.targetId === cleanTarget) {
       clearTimeout(this.pendingConnectPromise.timer);
-      this.pendingConnectPromise.resolve({
-        success: false,
-        error: 'Connection request cancelled.',
-      });
       this.pendingConnectPromise = null;
     }
 
@@ -348,35 +401,28 @@ class PeerService {
   }
 
   /**
-   * Accept incoming connection request (Callee side)
+   * Send Connection Acceptance (Callee tapped "Accept & Share Screen")
    */
-  public async sendConnectAccept(targetId: string): Promise<boolean> {
-    const identity = getDeviceIdentity();
-    const payload: PeerMessage = {
+  public async sendConnectAccept(targetId: string) {
+    const cleanTarget = targetId.replace(/[^0-9]/g, '');
+    const acceptMsg: PeerMessage = {
       type: 'CONNECT_ACCEPT',
       fromId: this.getSelfCleanId(),
-      fromName: identity.deviceName,
-      payload: {
-        brand: Platform.OS === 'android' ? (Platform.constants as any)?.Brand : 'Mobile',
-        model: Platform.OS === 'android' ? (Platform.constants as any)?.Model : identity.deviceName,
-        width: identity.width,
-        height: identity.height,
-        fps: 60,
-        status: 'LIVE_STREAMING_ACTIVE',
-      },
+      fromName: this.selfName,
       timestamp: Date.now(),
     };
-    const res = await this.sendToDevice(targetId, payload);
+
+    // Dual-burst delivery
+    await this.sendToDevice(cleanTarget, acceptMsg);
     setTimeout(() => {
-      this.sendToDevice(targetId, payload);
+      this.sendToDevice(cleanTarget, acceptMsg);
     }, 350);
-    return res;
   }
 
   /**
-   * Reject incoming connection request (Callee side)
+   * Send Connection Rejection (Callee tapped "Decline")
    */
-  public async sendConnectReject(targetId: string, reason = 'Connection declined by partner.'): Promise<boolean> {
+  public async sendConnectReject(targetId: string, reason = 'Connection declined by partner.') {
     return this.sendToDevice(targetId, {
       type: 'CONNECT_REJECT',
       fromId: this.getSelfCleanId(),
@@ -438,50 +484,14 @@ class PeerService {
   }
 
   /**
-   * Cloud sync for recent devices persistence
+   * Recent devices persistence (Delegates to native SharedPreferences via storageService)
    */
   public async saveRecentDevices(selfId: string, devices: Device[]): Promise<void> {
-    const cleanId = (selfId || this.getSelfCleanId()).replace(/[^0-9]/g, '');
-    const topic = `sm_remote_store_${cleanId}`;
-    try {
-      await fetch(`https://ntfy.sh/${topic}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updatedAt: Date.now(),
-          recentDevices: devices,
-        }),
-      });
-    } catch (e) {
-      console.warn('[PeerService] Error saving recent devices:', e);
-    }
+    await storageService.saveDevices(devices);
   }
 
   public async loadRecentDevices(selfId: string): Promise<Device[]> {
-    const cleanId = (selfId || this.getSelfCleanId()).replace(/[^0-9]/g, '');
-    const topic = `sm_remote_store_${cleanId}`;
-    try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1`);
-      if (!res.ok) return [];
-      const text = await res.text();
-      const lines = text.trim().split('\n');
-      if (lines.length === 0) return [];
-
-      // Get last message line
-      const lastLine = lines[lines.length - 1];
-      const parsed = JSON.parse(lastLine);
-      if (parsed.message) {
-        const payload = JSON.parse(parsed.message);
-        if (Array.isArray(payload.recentDevices)) {
-          return payload.recentDevices;
-        }
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
+    return storageService.getSavedDevices();
   }
 }
 

@@ -21,7 +21,7 @@
 
 📍 **পাথ:** `apk/`
 - 📱 **`SM_Remote_Controller.apk`** — ⭐ **প্রধান প্রোডাকশন APK (প্রতিবার GitHub Release-এ এই ফাইলটিই আপলোড করতে হবে!)**।
-- 📱 **`SM_Remote_Controller_v1.5.3.apk`** — আপনার লোকাল পিসিতে বর্তমান ভার্সনটির ব্যাকআপ কপি।
+- 📱 **`SM_Remote_Controller_v1.5.4.apk`** — আপনার লোকাল পিসিতে বর্তমান ভার্সনটির ব্যাকআপ কপি।
 
 > 💡 **নোট:** আপনি যখনই `node scripts/build_all.js` বা `npm run build:all` চালাবেন, স্ক্রিপ্টটি স্বয়ংক্রিয়ভাবে পুরনো ভার্সন ক্লিন করে শুধুমাত্র এই দুটি ফাইল রাখবে।
 
@@ -47,40 +47,41 @@ npm run build:all
 > আগের ভার্সন যদি হয় `1.5.2`, তবে পরবর্তী ভার্সন অবশ্যই `1.5.3` করতে হবে এবং `versionCode` ৮ থেকে বাড়িয়ে ৯ করতে হবে। একই ভার্সন রাখলে অ্যাপ ভাববে সে অলরেডি আপ-টু-ডেট আছে, তাই আপডেট নোটিফিকেশন আসবে না!
 >
 > ⚠️ **গোল্ডেন রুল ২: GitHub Release-এ সবসময় `SM_Remote_Controller.apk` ফাইলটি আপলোড করতে হবে!**  
-> ভার্সন নাম্বার ওয়ালা ফাইলটি (`SM_Remote_Controller_v1.5.3.apk`) শুধুই আপনার পিসির ব্যাকআপ। অ্যাপের ভেতর যখন ব্যবহারকারী "Update Now" চাপবে, অ্যাপটি GitHub থেকে নির্দিষ্ট নাম `SM_Remote_Controller.apk` ডাউনলোড করতে যায়। তাই GitHub-এ সবসময় ফিক্সড নামের `SM_Remote_Controller.apk` ফাইলটিই আপলোড করবেন।
+> ভার্সন নাম্বার ওয়ালা ফাইলটি (`SM_Remote_Controller_v1.5.4.apk`) শুধুই আপনার পিসির ব্যাকআপ। অ্যাপের ভেতর যখন ব্যবহারকারী "Update Now" চাপবে, অ্যাপটি GitHub থেকে নির্দিষ্ট নাম `SM_Remote_Controller.apk` ডাউনলোড করতে যায়। তাই GitHub-এ সবসময় ফিক্সড নামের `SM_Remote_Controller.apk` ফাইলটিই আপলোড করবেন।
 
 ### ধাপ ১: `version.json` ও `build.gradle` ফাইল আপডেট
 [version.json](file:///d:/Panel/My-app/sm-remote-controller/version.json) ফাইলে ভার্সন নাম্বার ১ ধাপ বাড়িয়ে ও চেঞ্জলগ সেট করুন:
 ```json
 {
-  "version": "1.5.3",
-  "versionCode": 9,
+  "version": "1.5.4",
+  "versionCode": 10,
   "releaseDate": "2026-10-20",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.3/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.4/SM_Remote_Controller.apk",
   "changelog": [
-    "⚡ AnyDesk-style incoming connection request & accept/decline popup",
-    "🔄 Dual-channel real-time signaling (WebSocket + HTTP fast poll)",
-    "🗑️ Dynamic Recent Devices persistence (deletions stay deleted)"
+    "🚀 Enterprise Multi-Broker MQTT Signaling Cluster (EMQX + HiveMQ)",
+    "⚡ Instant AnyDesk-style incoming request popup with zero delay",
+    "🛡️ Fixed package visibility download error on Android 11-15",
+    "📱 Real-time remote screen viewing & bidirectional touch dispatch"
   ]
 }
 ```
 এবং [android/app/build.gradle](file:///d:/Panel/My-app/sm-remote-controller/android/app/build.gradle)-এ:
 ```groovy
-versionCode 9
-versionName "1.5.3"
+versionCode 10
+versionName "1.5.4"
 ```
 
 ### ধাপ ২: ফ্রেশ APK বিল্ড করা
 ```powershell
 npm run build:all
 ```
-*(এই কমান্ডটি স্বয়ংক্রিয়ভাবে `SM_Remote_Controller.apk` তৈরি করবে এবং `SM_Remote_Controller_v1.5.3.apk` ব্যাকআপ রেখে পুরনোটি মুছে দেবে)*
+*(এই কমান্ডটি স্বয়ংক্রিয়ভাবে `SM_Remote_Controller.apk` তৈরি করবে এবং `SM_Remote_Controller_v1.5.4.apk` ব্যাকআপ রেখে পুরনোটি মুছে দেবে)*
 
 ### ধাপ ৩: গিট কমিট ও পুশ করা
 ```powershell
 git add .
-git commit -m "release: bump version to v1.5.3"
+git commit -m "release: bump version to v1.5.4"
 git push origin main
 ```
 
@@ -88,8 +89,8 @@ git push origin main
 1. GitHub রিপোজিটরির **Releases** পেইজে যান:  
    👉 `https://github.com/shantocnits/sm-remote-controller/releases`
 2. **"Draft a new release"** বাটনে ক্লিক করুন।
-3. **Choose a tag:** লিখুন `v1.5.3` (এবং Create new tag সিলেক্ট করুন)।
-4. **Release title:** দিন `SM Remote Controller v1.5.3`
+3. **Choose a tag:** লিখুন `v1.5.4` (এবং Create new tag সিলেক্ট করুন)।
+4. **Release title:** দিন `SM Remote Controller v1.5.4`
 5. **Attach binaries:** আপনার প্রজেক্টের `apk/` ফোল্ডার থেকে শুধুমাত্র **`SM_Remote_Controller.apk`** ফাইলটি ড্র্যাগ অ্যান্ড ড্রপ করে আপলোড করুন।
 6. **"Publish release"** বাটনে ক্লিক করুন।
 

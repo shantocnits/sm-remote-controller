@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Linking } from 'react-native';
 import { Device } from '../types';
 import { getCleanDeviceId } from '../utils/deviceUtils';
 
@@ -127,6 +127,24 @@ class StorageService {
    */
   public async saveDevices(devices: Device[]): Promise<void> {
     await this.setItem('saved_recent_devices', JSON.stringify(devices));
+  }
+
+  /**
+   * Universal URL opener bypassing Android package visibility restrictions
+   */
+  public async openUrl(url: string): Promise<boolean> {
+    if (LocalStorageModule && typeof LocalStorageModule.openUrl === 'function') {
+      try {
+        await LocalStorageModule.openUrl(url);
+        return true;
+      } catch (e) {}
+    }
+    try {
+      await Linking.openURL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

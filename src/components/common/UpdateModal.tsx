@@ -97,11 +97,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     setDownloadStarted(true);
 
     try {
-      const supported = await Linking.canOpenURL(updateInfo.downloadUrl);
-      if (supported) {
-        await storageService.setAcknowledgedUpdateVersion(updateInfo.latestVersion);
-        await Linking.openURL(updateInfo.downloadUrl);
-        setHasNewUpdate(false);
+      await storageService.setAcknowledgedUpdateVersion(updateInfo.latestVersion);
+      setHasNewUpdate(false);
+      const opened = await storageService.openUrl(updateInfo.downloadUrl);
+      if (opened) {
         const msg = `📥 Downloading v${updateInfo.latestVersion} APK...\nOnce downloaded, tap the notification or open Downloads to install the update.`;
         if (Platform.OS === 'android') {
           ToastAndroid.show(msg, ToastAndroid.LONG);
@@ -109,7 +108,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           Alert.alert('Download Started', msg);
         }
       } else {
-        Alert.alert('Download Error', 'Cannot open download link on this device.');
+        Alert.alert(
+          'Download Link',
+          `Cannot automatically open browser. Link:\n${updateInfo.downloadUrl}`
+        );
       }
     } catch (err: any) {
       Alert.alert('Download Failed', err?.message || 'Could not launch browser to download APK.');

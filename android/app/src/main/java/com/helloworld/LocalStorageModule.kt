@@ -1,6 +1,8 @@
 package com.helloworld
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.content.SharedPreferences
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -39,6 +41,18 @@ class LocalStorageModule(reactContext: ReactApplicationContext) : ReactContextBa
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("STORAGE_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun openUrl(url: String, promise: Promise) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("BROWSER_ERROR", e.message)
         }
     }
 }
