@@ -106,26 +106,14 @@ export const HomeScreen: React.FC = () => {
     );
   };
 
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+
   const handleOpenAccessibility = () => {
-    Alert.alert(
-      'Remote Touch Access',
-      'Android 13/14-এ এক্সেসিবিলিটি অন করার নিয়ম:\n\n১. "App was denied access" দেখালে নিচের "১. App Info (৩ ডট)" চাপুন -> উপরে ডানদিকের ৩ ডটে (⁝) চেপে "Allow restricted settings" দিন।\n\n২. এরপর "২. Accessibility"-তে গিয়ে "SM CONTROLLER" চালু করুন।',
-      [
-        { text: 'বাতিল', style: 'cancel' },
-        {
-          text: '১. App Info (৩ ডট)',
-          onPress: () => {
-            NativeModules.ScreenCaptureModule?.openAppSettings?.();
-          },
-        },
-        {
-          text: '২. Accessibility',
-          onPress: () => {
-            NativeModules.ScreenCaptureModule?.openAccessibilitySettings?.();
-          },
-        },
-      ]
-    );
+    NativeModules.ScreenCaptureModule?.openAccessibilitySettings?.();
+  };
+
+  const handleOpenAppInfo = () => {
+    NativeModules.ScreenCaptureModule?.openAppSettings?.();
   };
 
   const hasDevices = devices.length > 0;
@@ -154,25 +142,36 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Accessibility Permission Warning Banner for Remote Touch Control */}
-        {!isAccessibilityOn && (
-          <TouchableOpacity
-            style={styles.accessibilityWarningCard}
-            activeOpacity={0.8}
-            onPress={handleOpenAccessibility}>
-            <View style={styles.accessibilityWarningLeft}>
+        {/* 1-Click Simple Banner (Screen sharing works without this; Touch is optional) */}
+        {!isAccessibilityOn && !isBannerDismissed && (
+          <View style={styles.accessibilityWarningCard}>
+            <TouchableOpacity
+              style={styles.accessibilityWarningLeft}
+              activeOpacity={0.8}
+              onPress={handleOpenAccessibility}>
               <Text style={styles.accessibilityWarningIcon}>⚡</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accessibilityWarningTitle}>Enable Remote Touch Control</Text>
+                <Text style={styles.accessibilityWarningTitle}>Remote Touch (ঐচ্ছিক)</Text>
                 <Text style={styles.accessibilityWarningSub}>
-                  Turn ON "SM CONTROLLER" in Accessibility Settings so partner can touch & control your screen remotely.
+                  স্ক্রিন শেয়ার এমনিতেই ১-ক্লিকে হবে। রিমোট টাচ দিতে চাইলে ১-ক্লিক করুন।
                 </Text>
               </View>
-            </View>
-            <View style={styles.accessibilityEnableBtn}>
-              <Text style={styles.accessibilityEnableBtnText}>Enable</Text>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.accessibilityEnableBtn}
+              activeOpacity={0.8}
+              onPress={handleOpenAccessibility}>
+              <Text style={styles.accessibilityEnableBtnText}>অন করুন</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ paddingHorizontal: 8, paddingVertical: 6 }}
+              activeOpacity={0.7}
+              onPress={() => setIsBannerDismissed(true)}>
+              <Text style={{ color: '#94a3b8', fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         <DeviceIdCard />
