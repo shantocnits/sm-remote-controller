@@ -48,7 +48,21 @@ class ScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        try {
+            createNotificationChannel()
+            val notification = buildForegroundNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -65,6 +79,8 @@ class ScreenCaptureService : Service() {
                 }
                 if (resultCode != 0 && resultData != null) {
                     startScreenSharing(resultCode, resultData)
+                } else {
+                    stopSelf()
                 }
             }
             ACTION_STOP -> {
@@ -76,17 +92,6 @@ class ScreenCaptureService : Service() {
     }
 
     private fun startScreenSharing(resultCode: Int, resultData: Intent) {
-        val notification = buildForegroundNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-
         try {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
@@ -102,10 +107,11 @@ class ScreenCaptureService : Service() {
             mediaProjection?.registerCallback(projectionCallback, backgroundHandler)
 
             val metrics = Resources.getSystem().displayMetrics
-            // Downscale to 480 width for fast, smooth and rock-solid 60 FPS mobile streaming
+            val screenWidth = if (metrics.widthPixels > 0) metrics.widthPixels else 1080
+            val screenHeight = if (metrics.heightPixels > 0) metrics.heightPixels else 2400
             val targetWidth = 480
-            val targetHeight = (480f * metrics.heightPixels / metrics.widthPixels).toInt()
-            val density = metrics.densityDpi
+            val targetHeight = (480f * screenHeight / screenWidth).toInt()
+            val density = if (metrics.densityDpi > 0) metrics.densityDpi else 320
 
             imageReader = ImageReader.newInstance(targetWidth, targetHeight, PixelFormat.RGBA_8888, 2)
             virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -144,13 +150,15 @@ class ScreenCaptureService : Service() {
             lastFrameTime = now
 
             val planes = image.planes
+            if (planes.isEmpty()) return
             val buffer = planes[0].buffer
             val pixelStride = planes[0].pixelStride
             val rowStride = planes[0].rowStride
-            val rowPadding = rowStride - pixelStride * width
+            val pStride = if (pixelStride > 0) pixelStride else 1
+            val rowPadding = Math.max(0, rowStride - pStride * width)
 
             val bitmap = Bitmap.createBitmap(
-                width + rowPadding / pixelStride,
+                width + rowPadding / pStride,
                 height,
                 Bitmap.Config.ARGB_8888
             )
@@ -174,9 +182,11 @@ class ScreenCaptureService : Service() {
             }
             bitmap.recycle()
         } catch (e: Exception) {
-            // Frame processing error ignored
+            // Frame processing error safely ignored
         } finally {
-            image?.close()
+            try {
+                image?.close()
+            } catch (e: Exception) {}
         }
     }
 
@@ -190,7 +200,10 @@ class ScreenCaptureService : Service() {
             mediaProjection?.stop()
             mediaProjection = null
         } catch (e: Exception) {}
-        stopForeground(true)
+        try {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        } catch (e: Throwable) {}
     }
 
     override fun onDestroy() {
@@ -219,10 +232,12 @@ class ScreenCaptureService : Service() {
             Notification.Builder(this)
         }
 
+        val iconRes = if (applicationInfo.icon != 0) applicationInfo.icon else android.R.drawable.stat_notify_sync
+
         return builder
             .setContentTitle("SM Controller — Screen Sharing Active")
             .setContentText("Broadcasting live screen to remote partner device")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setSmallIcon(iconRes)
             .setOngoing(true)
             .build()
     }

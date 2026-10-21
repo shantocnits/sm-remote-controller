@@ -106,6 +106,20 @@ class ScreenCaptureModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun openAppSettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = android.net.Uri.fromParts("package", reactContext.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            reactContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("SETTINGS_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun dispatchTouch(relX: Double, relY: Double, promise: Promise) {
         try {
             val metrics = Resources.getSystem().displayMetrics

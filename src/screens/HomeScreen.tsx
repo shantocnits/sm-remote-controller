@@ -106,6 +106,28 @@ export const HomeScreen: React.FC = () => {
     );
   };
 
+  const handleOpenAccessibility = () => {
+    Alert.alert(
+      'Remote Touch Access',
+      'Android 13/14-এ এক্সেসিবিলিটি অন করার নিয়ম:\n\n১. "App was denied access" দেখালে নিচের "১. App Info (৩ ডট)" চাপুন -> উপরে ডানদিকের ৩ ডটে (⁝) চেপে "Allow restricted settings" দিন।\n\n২. এরপর "২. Accessibility"-তে গিয়ে "SM CONTROLLER" চালু করুন।',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: '১. App Info (৩ ডট)',
+          onPress: () => {
+            NativeModules.ScreenCaptureModule?.openAppSettings?.();
+          },
+        },
+        {
+          text: '২. Accessibility',
+          onPress: () => {
+            NativeModules.ScreenCaptureModule?.openAccessibilitySettings?.();
+          },
+        },
+      ]
+    );
+  };
+
   const hasDevices = devices.length > 0;
 
   const renderHeader = useMemo(
@@ -137,9 +159,7 @@ export const HomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.accessibilityWarningCard}
             activeOpacity={0.8}
-            onPress={() => {
-              NativeModules.ScreenCaptureModule?.openAccessibilitySettings();
-            }}>
+            onPress={handleOpenAccessibility}>
             <View style={styles.accessibilityWarningLeft}>
               <Text style={styles.accessibilityWarningIcon}>⚡</Text>
               <View style={{ flex: 1 }}>
