@@ -289,7 +289,7 @@ class PeerService {
   /**
    * Send message to remote device with guaranteed delivery
    */
-  public async sendToDevice(targetId: string, message: PeerMessage): Promise<boolean> {
+  public async sendToDevice(targetId: string, message: PeerMessage, qos: 0 | 1 = 1): Promise<boolean> {
     const cleanTarget = targetId.replace(/[^0-9]/g, '');
     const topic = `sm/controller/${cleanTarget}`;
     const payload = JSON.stringify({
@@ -303,7 +303,7 @@ class PeerService {
       try {
         const pahoMsg = new Paho.Message(payload);
         pahoMsg.destinationName = topic;
-        pahoMsg.qos = 1; // QoS 1 ensures guaranteed delivery across mobile networks
+        pahoMsg.qos = qos;
         this.client.send(pahoMsg);
         return true;
       } catch (err) {
@@ -311,8 +311,10 @@ class PeerService {
       }
     }
 
-    // Queue if momentarily disconnected
-    this.pendingQueue.push({ topic, message: payload, qos: 1 });
+    // Only queue critical control messages (qos 1), never queue video stream frames (qos 0)
+    if (qos === 1) {
+      this.pendingQueue.push({ topic, message: payload, qos: 1 });
+    }
     if (!this.isConnected && !this.isConnecting) {
       this.connectMqtt();
     }

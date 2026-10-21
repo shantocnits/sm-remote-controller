@@ -1,9 +1,9 @@
 {
-  "version": "1.5.7",
-  "versionCode": 13,
+  "version": "1.5.8",
+  "versionCode": 14,
   "releaseDate": "2026-10-21",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.7/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.8/SM_Remote_Controller.apk",
   "changelog": [
     "🚀 Android 14 MediaProjection callback fix — Screen sharing now works on ALL Android devices",
     "🛡️ Double-buffered frame rendering eliminates 100% of screen flickering / blinking",

@@ -109,8 +109,8 @@ class ScreenCaptureService : Service() {
             val metrics = Resources.getSystem().displayMetrics
             val screenWidth = if (metrics.widthPixels > 0) metrics.widthPixels else 1080
             val screenHeight = if (metrics.heightPixels > 0) metrics.heightPixels else 2400
-            val targetWidth = 480
-            val targetHeight = (480f * screenHeight / screenWidth).toInt()
+            val targetWidth = 360
+            val targetHeight = (360f * screenHeight / screenWidth).toInt()
             val density = if (metrics.densityDpi > 0) metrics.densityDpi else 320
 
             imageReader = ImageReader.newInstance(targetWidth, targetHeight, PixelFormat.RGBA_8888, 2)
@@ -142,9 +142,9 @@ class ScreenCaptureService : Service() {
             image = reader.acquireLatestImage()
             if (image == null) return
 
-            // Throttle to ~12 FPS (approx every 80ms) to ensure smooth 60 FPS rendering on viewer with zero network congestion
+            // Throttle to ~7.5 FPS (every 130ms) for high stability, low bandwidth (10-15KB per frame) and zero crash/OOM
             val now = System.currentTimeMillis()
-            if (now - lastFrameTime < 80) {
+            if (now - lastFrameTime < 130) {
                 return
             }
             lastFrameTime = now
@@ -170,12 +170,14 @@ class ScreenCaptureService : Service() {
                 bitmap
             }
 
-            val outStream = ByteArrayOutputStream()
-            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 48, outStream)
+            val outStream = ByteArrayOutputStream(16384)
+            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 35, outStream)
             val jpegBytes = outStream.toByteArray()
             val base64String = Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
 
-            frameListener?.invoke(base64String, width, height)
+            try {
+                frameListener?.invoke(base64String, width, height)
+            } catch (e: Exception) {}
 
             if (croppedBitmap != bitmap) {
                 croppedBitmap.recycle()

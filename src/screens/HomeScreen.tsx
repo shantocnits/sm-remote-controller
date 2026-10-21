@@ -142,31 +142,36 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 1-Click Simple Banner (Screen sharing works without this; Touch is optional) */}
+        {/* Simple Touch Unlock Banner */}
         {!isAccessibilityOn && !isBannerDismissed && (
           <View style={styles.accessibilityWarningCard}>
-            <TouchableOpacity
-              style={styles.accessibilityWarningLeft}
-              activeOpacity={0.8}
-              onPress={handleOpenAccessibility}>
+            <View style={styles.accessibilityWarningLeft}>
               <Text style={styles.accessibilityWarningIcon}>⚡</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.accessibilityWarningTitle}>Remote Touch (ঐচ্ছিক)</Text>
                 <Text style={styles.accessibilityWarningSub}>
-                  স্ক্রিন শেয়ার এমনিতেই ১-ক্লিকে হবে। রিমোট টাচ দিতে চাইলে ১-ক্লিক করুন।
+                  স্ক্রিন শেয়ার এমনিতেই কাজ করবে। রিমোট টাচ দিতে চাইলে নিচের বাটনে চাপুন:
                 </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  <TouchableOpacity
+                    style={[styles.accessibilityEnableBtn, { backgroundColor: '#f59e0b' }]}
+                    activeOpacity={0.8}
+                    onPress={handleOpenAppInfo}>
+                    <Text style={[styles.accessibilityEnableBtnText, { color: '#000000', fontWeight: 'bold' }]}>১. ৩-ডট আনলক</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.accessibilityEnableBtn}
+                    activeOpacity={0.8}
+                    onPress={handleOpenAccessibility}>
+                    <Text style={styles.accessibilityEnableBtnText}>২. এক্সেসিবিলিটি</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
-              style={styles.accessibilityEnableBtn}
-              activeOpacity={0.8}
-              onPress={handleOpenAccessibility}>
-              <Text style={styles.accessibilityEnableBtnText}>অন করুন</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ paddingHorizontal: 8, paddingVertical: 6 }}
+              style={{ paddingHorizontal: 6, paddingVertical: 4, alignSelf: 'flex-start' }}
               activeOpacity={0.7}
               onPress={() => setIsBannerDismissed(true)}>
               <Text style={{ color: '#94a3b8', fontSize: 16, fontWeight: 'bold' }}>✕</Text>

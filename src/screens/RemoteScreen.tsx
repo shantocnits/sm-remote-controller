@@ -562,23 +562,14 @@ export const RemoteScreen: React.FC = () => {
           setViewportDimensions({ width, height });
         }}
         {...panResponder.panHandlers}>
-        {/* Double-buffered frames to eliminate black flicker/blinking */}
-        {prevFrame && (
-          <Image
-            source={{ uri: `data:image/jpeg;base64,${prevFrame}` }}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="contain"
-          />
-        )}
         {currentFrame && (
           <Image
             source={{ uri: `data:image/jpeg;base64,${currentFrame}` }}
             style={StyleSheet.absoluteFillObject}
             resizeMode="contain"
-            onLoad={() => setPrevFrame(currentFrame)}
           />
         )}
-        {!currentFrame && !prevFrame && (
+        {!currentFrame && (
           <View style={styles.waitingFrameContainer}>
             <Animated.View
               style={[

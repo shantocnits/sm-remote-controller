@@ -54,19 +54,23 @@ class ScreenStreamService {
         this.frameCount++;
 
         // Send frame packet to viewer device via MQTT QoS 0 for fast streaming
-        peerService.sendToDevice(this.currentPartnerId, {
-          type: 'HEARTBEAT',
-          fromId: getCleanDeviceId(),
-          fromName: getDeviceIdentity().deviceName,
-          payload: {
-            streamEvent: 'LIVE_FRAME',
-            frameData: event.frame,
-            width: event.width || 540,
-            height: event.height || 960,
+        peerService.sendToDevice(
+          this.currentPartnerId,
+          {
+            type: 'HEARTBEAT',
+            fromId: getCleanDeviceId(),
+            fromName: getDeviceIdentity().deviceName,
+            payload: {
+              streamEvent: 'LIVE_FRAME',
+              frameData: event.frame,
+              width: event.width || 360,
+              height: event.height || 640,
+              timestamp: Date.now(),
+            },
             timestamp: Date.now(),
           },
-          timestamp: Date.now(),
-        });
+          0 // Fire-and-forget QoS 0 for real-time video frames
+        );
       }
     });
   }
