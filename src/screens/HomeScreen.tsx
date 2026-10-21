@@ -116,6 +116,17 @@ export const HomeScreen: React.FC = () => {
     NativeModules.ScreenCaptureModule?.openAppSettings?.();
   };
 
+  const showPermissionHelp = () => {
+    Alert.alert(
+      '৩-ডট পারমিশন আনলক করার সঠিক নিয়ম',
+      '১ম ধাপ: "১. এক্সেসিবিলিটি" বাটনে চাপুন > SM Controller সিলেক্ট করে On করার চেষ্টা করুন। Android একটি রেস্ট্রিক্টেড পপআপ দেখাবে, সেটাতে OK চাপুন।\n\n' +
+      '২য় ধাপ: এবার "২. ৩-ডট আনলক" বাটনে চাপুন > উপরে ডানদিকের ৩টি ডট (⋮) চাপুন > "Allow restricted settings" (বা রেস্ট্রিক্টেড সেটিং অনুমোদন) এ চাপুন এবং ফিঙ্গারপ্রিন্ট/পিন দিন।\n\n' +
+      '৩য় ধাপ: আবার "১. এক্সেসিবিলিটি"-তে গিয়ে On করে দিন।\n\n' +
+      '💡 বিশেষ দ্রষ্টব্য: লাইভ স্ক্রিন দেখার জন্য এই পারমিশনের প্রয়োজন নেই, স্ক্রিন শেয়ার সরাসরি এমনিতেই চলবে!',
+      [{ text: 'বুঝেছি', style: 'default' }]
+    );
+  };
+
   const hasDevices = devices.length > 0;
 
   const renderHeader = useMemo(
@@ -150,21 +161,28 @@ export const HomeScreen: React.FC = () => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.accessibilityWarningTitle}>Remote Touch (ঐচ্ছিক)</Text>
                 <Text style={styles.accessibilityWarningSub}>
-                  স্ক্রিন শেয়ার এমনিতেই কাজ করবে। রিমোট টাচ দিতে চাইলে নিচের বাটনে চাপুন:
+                  স্ক্রিন শেয়ার সরাসরি চলবে। দূর থেকে টাচ কন্ট্রোল দিতে নিচের ধাপ ২টি করুন:
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={[styles.accessibilityEnableBtn, { backgroundColor: '#38bdf8' }]}
+                    activeOpacity={0.8}
+                    onPress={handleOpenAccessibility}>
+                    <Text style={[styles.accessibilityEnableBtnText, { color: '#000000', fontWeight: 'bold' }]}>১. এক্সেসিবিলিটি</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={[styles.accessibilityEnableBtn, { backgroundColor: '#f59e0b' }]}
                     activeOpacity={0.8}
                     onPress={handleOpenAppInfo}>
-                    <Text style={[styles.accessibilityEnableBtnText, { color: '#000000', fontWeight: 'bold' }]}>১. ৩-ডট আনলক</Text>
+                    <Text style={[styles.accessibilityEnableBtnText, { color: '#000000', fontWeight: 'bold' }]}>২. ৩-ডট আনলক</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.accessibilityEnableBtn}
+                    style={[styles.accessibilityEnableBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
                     activeOpacity={0.8}
-                    onPress={handleOpenAccessibility}>
-                    <Text style={styles.accessibilityEnableBtnText}>২. এক্সেসিবিলিটি</Text>
+                    onPress={showPermissionHelp}>
+                    <Text style={[styles.accessibilityEnableBtnText, { color: '#ffffff' }]}>❓ নিয়মাবলী</Text>
                   </TouchableOpacity>
                 </View>
               </View>

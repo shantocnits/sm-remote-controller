@@ -18,8 +18,8 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.util.Base64
 import java.io.ByteArrayOutputStream
 
@@ -41,6 +41,7 @@ class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
+    private var handlerThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
     private var lastFrameTime: Long = 0
 
@@ -50,16 +51,6 @@ class ScreenCaptureService : Service() {
         super.onCreate()
         try {
             createNotificationChannel()
-            val notification = buildForegroundNotification()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -93,10 +84,29 @@ class ScreenCaptureService : Service() {
 
     private fun startScreenSharing(resultCode: Int, resultData: Intent) {
         try {
+            // Android 14+ requires startForeground with mediaProjection right before getMediaProjection
+            val notification = buildForegroundNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
+            if (mediaProjection == null) {
+                stopSelf()
+                return
+            }
 
-            backgroundHandler = Handler(Looper.getMainLooper())
+            if (handlerThread == null) {
+                handlerThread = HandlerThread("SM_ScreenCapture_Thread").apply { start() }
+                backgroundHandler = Handler(handlerThread!!.looper)
+            }
 
             // Android 14 (API 34+) requires registering callback before createVirtualDisplay
             val projectionCallback = object : MediaProjection.Callback() {
@@ -110,7 +120,10 @@ class ScreenCaptureService : Service() {
             val screenWidth = if (metrics.widthPixels > 0) metrics.widthPixels else 1080
             val screenHeight = if (metrics.heightPixels > 0) metrics.heightPixels else 2400
             val targetWidth = 360
-            val targetHeight = (360f * screenHeight / screenWidth).toInt()
+            var targetHeight = (360f * screenHeight / screenWidth).toInt()
+            if (targetHeight % 2 != 0) {
+                targetHeight += 1
+            }
             val density = if (metrics.densityDpi > 0) metrics.densityDpi else 320
 
             imageReader = ImageReader.newInstance(targetWidth, targetHeight, PixelFormat.RGBA_8888, 2)
@@ -130,7 +143,7 @@ class ScreenCaptureService : Service() {
             }, backgroundHandler)
 
             isCapturing = true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
             stopScreenSharing()
         }
@@ -183,12 +196,12 @@ class ScreenCaptureService : Service() {
                 croppedBitmap.recycle()
             }
             bitmap.recycle()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // Frame processing error safely ignored
         } finally {
             try {
                 image?.close()
-            } catch (e: Exception) {}
+            } catch (e: Throwable) {}
         }
     }
 
@@ -197,11 +210,20 @@ class ScreenCaptureService : Service() {
         try {
             virtualDisplay?.release()
             virtualDisplay = null
+        } catch (e: Throwable) {}
+        try {
             imageReader?.close()
             imageReader = null
+        } catch (e: Throwable) {}
+        try {
             mediaProjection?.stop()
             mediaProjection = null
-        } catch (e: Exception) {}
+        } catch (e: Throwable) {}
+        try {
+            handlerThread?.quitSafely()
+            handlerThread = null
+            backgroundHandler = null
+        } catch (e: Throwable) {}
         try {
             @Suppress("DEPRECATION")
             stopForeground(true)
