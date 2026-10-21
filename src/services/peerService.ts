@@ -29,6 +29,7 @@ export interface PeerMessage {
     | 'CONNECT_REJECT'
     | 'CONNECT_CANCEL'
     | 'TOUCH'
+    | 'SWIPE'
     | 'KEY'
     | 'NAV'
     | 'DISCONNECT'
@@ -441,6 +442,26 @@ class PeerService {
       fromId: this.getSelfCleanId(),
       fromName: this.selfName,
       payload: { relX, relY, x: relX, y: relY },
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Send remote swipe gesture to partner device
+   */
+  public sendSwipe(
+    targetId: string,
+    startRelX: number,
+    startRelY: number,
+    endRelX: number,
+    endRelY: number,
+    durationMs: number = 250
+  ) {
+    this.sendToDevice(targetId, {
+      type: 'SWIPE',
+      fromId: this.getSelfCleanId(),
+      fromName: this.selfName,
+      payload: { startRelX, startRelY, endRelX, endRelY, duration: durationMs },
       timestamp: Date.now(),
     });
   }

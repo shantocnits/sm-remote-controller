@@ -316,8 +316,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   disconnectSession: () => {
     const current = get().connectedDevice;
-    if (current) {
-      peerService.sendDisconnect(current.code.replace(/[^0-9]/g, ''));
+    const incoming = get().incomingPartner;
+    const targetCode = current?.code || incoming?.id;
+    if (targetCode) {
+      peerService.sendDisconnect(targetCode.replace(/[^0-9]/g, ''));
     }
     screenStreamService.stopReceiving();
     screenStreamService.stopBroadcasting();
@@ -325,6 +327,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       connectedDevice: null,
       activeTab: 'home',
       incomingPartner: null,
+      incomingRequest: null,
     });
   },
 

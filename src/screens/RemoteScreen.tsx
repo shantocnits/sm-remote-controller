@@ -15,6 +15,7 @@ import {
   Dimensions,
   Share,
   Alert,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
@@ -54,9 +55,11 @@ export const RemoteScreen: React.FC = () => {
   // Session timer
   const [sessionSeconds, setSessionSeconds] = useState(1);
 
-  // Live remote frame from partner MediaProjection
-  const [liveFrame, setLiveFrame] = useState<string | null>(null);
-  const [viewportDimensions, setViewportDimensions] = useState({ width: SCREEN_WIDTH, height: 600 });
+  // Double-buffered frames to eliminate black flicker/blinking completely
+  const [currentFrame, setCurrentFrame] = useState<string | null>(null);
+  const [prevFrame, setPrevFrame] = useState<string | null>(null);
+  const viewportRef = useRef<{ width: number; height: number }>({ width: SCREEN_WIDTH, height: 600 });
+  const touchStartRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 });
 
   // Radar animation for scanner view
   const radarSpinAnim = useRef(new Animated.Value(0)).current;
@@ -106,11 +109,12 @@ export const RemoteScreen: React.FC = () => {
     };
   }, [radarSpinAnim, radarPulseAnim, spinAnim]);
 
-  // Listen to live screen frames
+  // Listen to live screen frames with double-buffered swap
   useEffect(() => {
     const unsub = screenStreamService.onLiveFrame((frame: LiveFrameData) => {
       if (frame && frame.frameData) {
-        setLiveFrame(frame.frameData);
+        setPrevFrame((old) => old || frame.frameData);
+        setCurrentFrame(frame.frameData);
       }
     });
     return () => unsub();
@@ -119,6 +123,52 @@ export const RemoteScreen: React.FC = () => {
   // Live remote touch position
   const [cursorPos, setCursorPos] = useState({ x: 190, y: 260 });
   const [touchActive, setTouchActive] = useState(false);
+
+  // PanResponder for smooth remote touch, click, swipe & scroll dispatch (AnyDesk style)
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        touchStartRef.current = { x: locationX, y: locationY, time: Date.now() };
+        setCursorPos({ x: Math.round(locationX), y: Math.round(locationY) });
+        setTouchActive(true);
+      },
+      onPanResponderMove: (evt) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        setCursorPos({ x: Math.round(locationX), y: Math.round(locationY) });
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        setTimeout(() => setTouchActive(false), 200);
+        const { locationX, locationY } = evt.nativeEvent;
+        const w = viewportRef.current.width || SCREEN_WIDTH;
+        const h = viewportRef.current.height || 600;
+        const startX = touchStartRef.current.x;
+        const startY = touchStartRef.current.y;
+        const dx = gestureState.dx;
+        const dy = gestureState.dy;
+        const distance = Math.hypot(dx, dy);
+
+        if (!partnerCleanCode) return;
+
+        if (distance < 12) {
+          // Tap gesture
+          const relX = Math.max(0, Math.min(1, locationX / w));
+          const relY = Math.max(0, Math.min(1, locationY / h));
+          peerService.sendTouch(partnerCleanCode, relX, relY);
+        } else {
+          // Swipe / Drag gesture
+          const startRelX = Math.max(0, Math.min(1, startX / w));
+          const startRelY = Math.max(0, Math.min(1, startY / h));
+          const endRelX = Math.max(0, Math.min(1, locationX / w));
+          const endRelY = Math.max(0, Math.min(1, locationY / h));
+          const duration = Math.min(600, Math.max(120, Date.now() - touchStartRef.current.time));
+          peerService.sendSwipe(partnerCleanCode, startRelX, startRelY, endRelX, endRelY, duration);
+        }
+      },
+    })
+  ).current;
 
   // Command history on remote screen
   const [commandLogs, setCommandLogs] = useState<string[]>([
@@ -174,8 +224,8 @@ export const RemoteScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = peerService.addListener((msg) => {
       if (msg.type === 'DISCONNECT') {
+        disconnectSession();
         Alert.alert('Session Ended', 'Partner disconnected from the remote session.');
-        setActiveTab('home');
       } else if (msg.type === 'TOUCH' && msg.payload) {
         setCursorPos({ x: msg.payload.x, y: msg.payload.y });
         setTouchActive(true);
@@ -397,13 +447,6 @@ export const RemoteScreen: React.FC = () => {
                 },
               ]}
             />
-            {/* Rotating radar sweep ray */}
-            <Animated.View
-              style={[
-                styles.radarSweepRay,
-                { transform: [{ rotate: radarSpin }] },
-              ]}
-            />
             {/* Center phone icon badge */}
             <View style={styles.radarHub}>
               <VectorIcon name="mobile" size={38} color={Colors.brandGreen} />
@@ -471,7 +514,7 @@ export const RemoteScreen: React.FC = () => {
           { paddingTop: Math.max(insets.top + 8, 20) },
         ]}>
         <View style={styles.partnerInfoPill}>
-          <LivePulseBadge color={Colors.dangerRed} size={8} />
+          <LivePulseBadge color={Colors.brandGreen} size={8} />
           <VectorIcon
             name="mobile"
             size={14}
@@ -486,13 +529,6 @@ export const RemoteScreen: React.FC = () => {
         </View>
 
         <View style={styles.headerRightRow}>
-          {/* Stream quality pill with live FPS and Ping */}
-          <View style={styles.streamQualityPill}>
-            <Text style={styles.streamQualityText}>
-              {streamStats.fps} FPS • {streamStats.pingMs}ms
-            </Text>
-          </View>
-
           {/* Recording indicator when active */}
           {isRecording && (
             <View style={styles.recBadge}>
@@ -517,85 +553,61 @@ export const RemoteScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Real-time Interactive Touch Screen Viewport */}
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handleTouchScreen}
-        style={styles.screenViewport}>
-        
-        {/* ================= REAL MOBILE OS INTERFACE ================= */}
-        <View style={styles.mobileOSContainer}>
-          {/* Phone Stream Frame */}
-          <View style={styles.mobileStreamFrame}>
-            {/* Remote Mobile Status Bar */}
-            <View style={styles.remoteStatusBar}>
-              <Text style={styles.remoteTimeText}>
-                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              <View style={styles.remoteStatusIcons}>
-                <Text style={styles.remoteStatusIconText}>5G</Text>
-                <VectorIcon name="mobile" size={12} color={Colors.brandGreen} />
-                <Text style={styles.remoteBatteryText}>85% 🔋</Text>
-              </View>
-            </View>
-
-            {/* Live Stream Banner */}
-            <View style={styles.liveStreamBanner}>
-              <View style={styles.liveStreamDot} />
-              <Text style={styles.liveStreamText}>
-                LIVE REMOTE MOBILE • {streamStats.fps} FPS • {streamStats.pingMs}ms
-              </Text>
-            </View>
-
-            {/* Real Captured Screen Viewport */}
-            <View
-              style={styles.realScreenDisplayArea}
-              onLayout={(e) => setViewportDimensions(e.nativeEvent.layout)}>
-              {liveFrame ? (
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${liveFrame}` }}
-                  style={styles.realLiveFrameImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <View style={styles.waitingFrameContainer}>
-                  <Animated.View
-                    style={[
-                      styles.waitingSpinner,
-                      {
-                        transform: [
-                          {
-                            rotate: spinAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: ['0deg', '360deg'],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}>
-                    <VectorIcon name="update" size={32} color={Colors.brandGreen} />
-                  </Animated.View>
-                  <Text style={styles.waitingFrameTitle}>Starting Screen Sharing...</Text>
-                  <Text style={styles.waitingFrameSub}>
-                    Connecting to {partnerName}'s live display.
-                  </Text>
-                  <Text style={styles.waitingFrameNote}>
-                    Even if {partnerName} minimizes SM Controller, their live Android screen will stream here in real time.
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Minimized Background Streaming Info */}
-            <View style={styles.backgroundStreamNotice}>
-              <VectorIcon name="mobile" size={14} color={Colors.brandGreen} />
-              <Text style={styles.backgroundStreamNoticeText}>
-                Live Touch &amp; Click Dispatch Active
-              </Text>
-            </View>
+      {/* Real-time Interactive Full-Width Edge-to-Edge Touch Screen Viewport */}
+      <View
+        style={styles.realScreenDisplayArea}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          viewportRef.current = { width, height };
+          setViewportDimensions({ width, height });
+        }}
+        {...panResponder.panHandlers}>
+        {/* Double-buffered frames to eliminate black flicker/blinking */}
+        {prevFrame && (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${prevFrame}` }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="contain"
+          />
+        )}
+        {currentFrame && (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${currentFrame}` }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="contain"
+            onLoad={() => setPrevFrame(currentFrame)}
+          />
+        )}
+        {!currentFrame && !prevFrame && (
+          <View style={styles.waitingFrameContainer}>
+            <Animated.View
+              style={[
+                styles.waitingSpinner,
+                {
+                  transform: [
+                    {
+                      rotate: spinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}>
+              <VectorIcon name="update" size={32} color={Colors.brandGreen} />
+            </Animated.View>
+            <Text style={styles.waitingFrameTitle}>Starting Screen Sharing...</Text>
+            <Text style={styles.waitingFrameSub}>
+              Connecting to {partnerName}'s live display.
+            </Text>
+            <Text style={styles.waitingFrameNote}>
+              Even if {partnerName} minimizes SM Controller, their live Android screen will stream here in real time.
+            </Text>
           </View>
+        )}
 
-          {/* Virtual Touch Ripple Pointer */}
+        {/* Virtual Touch Ripple Pointer */}
+        {touchActive && (
           <View
             pointerEvents="none"
             style={[
@@ -607,52 +619,21 @@ export const RemoteScreen: React.FC = () => {
             ]}>
             <View style={styles.touchRippleInner} />
           </View>
+        )}
+      </View>
 
-          {/* Android System Navigation Bar (Back, Home, Recents) */}
-          <View style={styles.androidNavBar}>
-            <TouchableOpacity
-              onPress={() => {
-                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'back');
-                showToast('◁ Back navigation sent to device', 'info');
-              }}
-              style={styles.navBarBtn}>
-              <Text style={styles.navBarBtnText}>◁</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'home');
-                showToast('○ Home navigation sent to device', 'info');
-              }}
-              style={styles.navBarBtn}>
-              <Text style={styles.navBarBtnText}>○</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'recents');
-                showToast('▢ Recents navigation sent to device', 'info');
-              }}
-              style={styles.navBarBtn}>
-              <Text style={styles.navBarBtnText}>▢</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      {/* Floating Action Toolbar */}
-      <View
-        style={[
-          styles.toolbarWrapper,
-          { bottom: Math.max(insets.bottom + 85, 95) },
-        ]}>
-        <View style={[styles.toolbar, Shadows.cardShadow]}>
+      {/* Bottom Controls Area (Docked cleanly below the screen so screen is never obscured) */}
+      <View style={[styles.bottomControlDock, { paddingBottom: Math.max(insets.bottom + 55, 65) }]}>
+        {/* Sleek, Compact Toolbar */}
+        <View style={styles.compactToolbar}>
           {/* 1. Keyboard Button */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleOpenKeyboard}
-            style={[styles.toolBtn, isKeyboardOpen && styles.toolBtnActive]}>
+            style={[styles.compactToolBtn, isKeyboardOpen && styles.compactToolBtnActive]}>
             <VectorIcon
               name="keyboard"
-              size={18}
+              size={15}
               color={isKeyboardOpen ? Colors.brandGreen : Colors.textWhite}
             />
           </TouchableOpacity>
@@ -661,8 +642,8 @@ export const RemoteScreen: React.FC = () => {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleTakeScreenshot}
-            style={styles.toolBtn}>
-            <VectorIcon name="camera" size={18} color={Colors.textWhite} />
+            style={styles.compactToolBtn}>
+            <VectorIcon name="camera" size={15} color={Colors.textWhite} />
           </TouchableOpacity>
 
           {/* 3. Mic / Mouth Speaker Mute Button */}
@@ -670,12 +651,12 @@ export const RemoteScreen: React.FC = () => {
             activeOpacity={0.7}
             onPress={toggleMic}
             style={[
-              styles.toolBtn,
-              isMicMuted ? styles.toolBtnMuted : styles.toolBtnUnmuted,
+              styles.compactToolBtn,
+              isMicMuted ? styles.compactToolBtnMuted : styles.compactToolBtnUnmuted,
             ]}>
             <VectorIcon
               name={isMicMuted ? 'microphone-slash' : 'microphone'}
-              size={18}
+              size={15}
               color={isMicMuted ? Colors.dangerRed : Colors.brandGreen}
             />
           </TouchableOpacity>
@@ -685,24 +666,49 @@ export const RemoteScreen: React.FC = () => {
             activeOpacity={0.7}
             onPress={toggleRecording}
             style={[
-              styles.toolBtn,
-              isRecording ? styles.toolBtnRecording : null,
+              styles.compactToolBtn,
+              isRecording ? styles.compactToolBtnRecording : null,
             ]}>
             <VectorIcon
               name={isRecording ? 'stop' : 'record'}
-              size={18}
+              size={15}
               color={isRecording ? Colors.dangerRed : Colors.textWhite}
             />
           </TouchableOpacity>
 
-          <View style={styles.divider} />
+          <View style={styles.compactDivider} />
 
-          {/* Disconnect Button */}
+          {/* 5. Disconnect Button */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleDisconnect}
-            style={styles.disconnectBtn}>
-            <VectorIcon name="phone-slash" size={16} color={Colors.dangerRed} />
+            style={styles.compactDisconnectBtn}>
+            <VectorIcon name="phone-slash" size={15} color={Colors.dangerRed} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Android Navigation Bar (◁ Back, ○ Home, ▢ Recents) */}
+        <View style={styles.androidNavBar}>
+          <TouchableOpacity
+            onPress={() => {
+              if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'back');
+            }}
+            style={styles.navBarBtn}>
+            <Text style={styles.navBarBtnText}>◁</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'home');
+            }}
+            style={styles.navBarBtn}>
+            <Text style={styles.navBarBtnText}>○</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              if (partnerCleanCode) peerService.sendNav(partnerCleanCode, 'recents');
+            }}
+            style={styles.navBarBtn}>
+            <Text style={styles.navBarBtnText}>▢</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1854,15 +1860,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.brandGreen,
     backgroundColor: 'rgba(45, 212, 191, 0.08)',
   },
-  radarSweepRay: {
-    position: 'absolute',
-    width: 110,
-    height: 110,
-    top: 10,
-    right: 10,
-    borderTopRightRadius: 110,
-    backgroundColor: 'rgba(45, 212, 191, 0.18)',
-  },
   radarHub: {
     width: 76,
     height: 76,
@@ -1912,10 +1909,11 @@ const styles = StyleSheet.create({
   realScreenDisplayArea: {
     flex: 1,
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#000000',
     overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   realLiveFrameImage: {
     width: '100%',
@@ -1957,5 +1955,84 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
+  },
+
+  // --- Compact Bottom Controls Dock (Docked cleanly below the screen) ---
+  bottomControlDock: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#090c12',
+    paddingTop: 8,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    zIndex: 30,
+  },
+  compactToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(24, 28, 38, 0.95)',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 6,
+  },
+  compactToolBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#161922',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactToolBtnActive: {
+    borderWidth: 1,
+    borderColor: Colors.brandGreen,
+    backgroundColor: 'rgba(45, 212, 191, 0.15)',
+  },
+  compactToolBtnMuted: {
+    borderWidth: 1,
+    borderColor: Colors.dangerRed,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  compactToolBtnUnmuted: {
+    backgroundColor: '#161922',
+  },
+  compactToolBtnRecording: {
+    borderWidth: 1.5,
+    borderColor: Colors.dangerRed,
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  compactDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    marginHorizontal: 2,
+  },
+  compactDisconnectBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: Colors.dangerRedSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  androidNavBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 36,
+    paddingVertical: 2,
+  },
+  navBarBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  navBarBtnText: {
+    color: '#94a3b8',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

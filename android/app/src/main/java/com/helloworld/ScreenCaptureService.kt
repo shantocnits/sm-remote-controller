@@ -57,7 +57,12 @@ class ScreenCaptureService : Service() {
         when (intent.action) {
             ACTION_START -> {
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
-                val resultData = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+                val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+                }
                 if (resultCode != 0 && resultData != null) {
                     startScreenSharing(resultCode, resultData)
                 }
@@ -86,10 +91,20 @@ class ScreenCaptureService : Service() {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
 
+            backgroundHandler = Handler(Looper.getMainLooper())
+
+            // Android 14 (API 34+) requires registering callback before createVirtualDisplay
+            val projectionCallback = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    stopScreenSharing()
+                }
+            }
+            mediaProjection?.registerCallback(projectionCallback, backgroundHandler)
+
             val metrics = Resources.getSystem().displayMetrics
-            // Downscale to 540x960 for high-performance low-latency streaming
-            val targetWidth = 540
-            val targetHeight = (540f * metrics.heightPixels / metrics.widthPixels).toInt()
+            // Downscale to 480 width for fast, smooth and rock-solid 60 FPS mobile streaming
+            val targetWidth = 480
+            val targetHeight = (480f * metrics.heightPixels / metrics.widthPixels).toInt()
             val density = metrics.densityDpi
 
             imageReader = ImageReader.newInstance(targetWidth, targetHeight, PixelFormat.RGBA_8888, 2)
@@ -101,16 +116,16 @@ class ScreenCaptureService : Service() {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader?.surface,
                 null,
-                null
+                backgroundHandler
             )
 
-            backgroundHandler = Handler(Looper.getMainLooper())
             imageReader?.setOnImageAvailableListener({ reader ->
                 processImageFrame(reader, targetWidth, targetHeight)
             }, backgroundHandler)
 
             isCapturing = true
         } catch (e: Exception) {
+            e.printStackTrace()
             stopScreenSharing()
         }
     }
@@ -148,7 +163,7 @@ class ScreenCaptureService : Service() {
             }
 
             val outStream = ByteArrayOutputStream()
-            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outStream)
+            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 48, outStream)
             val jpegBytes = outStream.toByteArray()
             val base64String = Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
 

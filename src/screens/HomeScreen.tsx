@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
+  NativeModules,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
@@ -31,9 +33,26 @@ export const HomeScreen: React.FC = () => {
   const incomingPartner = useAppStore((state) => state.incomingPartner);
   const setIncomingPartner = useAppStore((state) => state.setIncomingPartner);
   const setIncomingRequest = useAppStore((state) => state.setIncomingRequest);
+  const disconnectSession = useAppStore((state) => state.disconnectSession);
 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [isAccessibilityOn, setIsAccessibilityOn] = useState<boolean>(true);
+
+  // Monitor accessibility service status on Android
+  useEffect(() => {
+    const checkAccessibility = async () => {
+      if (Platform.OS === 'android' && NativeModules.ScreenCaptureModule?.isAccessibilityEnabled) {
+        try {
+          const enabled = await NativeModules.ScreenCaptureModule.isAccessibilityEnabled();
+          setIsAccessibilityOn(!!enabled);
+        } catch (e) {}
+      }
+    };
+    checkAccessibility();
+    const interval = setInterval(checkAccessibility, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize peer service and load persistent devices on mount
   useEffect(() => {
@@ -54,12 +73,11 @@ export const HomeScreen: React.FC = () => {
           setIncomingRequest(null);
         }
       } else if (msg.type === 'DISCONNECT') {
-        const currentPartner = useAppStore.getState().incomingPartner;
-        if (currentPartner && currentPartner.id === msg.fromId) {
-          screenStreamService.stopBroadcasting();
-          setIncomingPartner(null);
-          Alert.alert('Session Ended', `${msg.fromName || 'Partner'} has disconnected.`);
-        }
+        screenStreamService.stopBroadcasting();
+        screenStreamService.stopReceiving();
+        setIncomingPartner(null);
+        useAppStore.setState({ connectedDevice: null, incomingPartner: null, activeTab: 'home' });
+        Alert.alert('Session Ended', `${msg.fromName || 'Partner'} has disconnected.`);
       }
     });
 
@@ -106,14 +124,37 @@ export const HomeScreen: React.FC = () => {
               style={styles.stopBroadcastBtn}
               activeOpacity={0.8}
               onPress={() => {
-                screenStreamService.stopBroadcasting();
-                setIncomingPartner(null);
-                Alert.alert('Session Stopped', 'Screen sharing has been stopped.');
+                disconnectSession();
+                Alert.alert('Session Stopped', 'Screen sharing has been stopped on both phones.');
               }}>
               <Text style={styles.stopBroadcastBtnText}>Stop Screen Sharing</Text>
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Accessibility Permission Warning Banner for Remote Touch Control */}
+        {!isAccessibilityOn && (
+          <TouchableOpacity
+            style={styles.accessibilityWarningCard}
+            activeOpacity={0.8}
+            onPress={() => {
+              NativeModules.ScreenCaptureModule?.openAccessibilitySettings();
+            }}>
+            <View style={styles.accessibilityWarningLeft}>
+              <Text style={styles.accessibilityWarningIcon}>⚡</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accessibilityWarningTitle}>Enable Remote Touch Control</Text>
+                <Text style={styles.accessibilityWarningSub}>
+                  Turn ON "SM CONTROLLER" in Accessibility Settings so partner can touch & control your screen remotely.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.accessibilityEnableBtn}>
+              <Text style={styles.accessibilityEnableBtnText}>Enable</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         <DeviceIdCard />
         <RemoteConnectCard />
 
@@ -272,5 +313,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  accessibilityWarningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.3)',
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  accessibilityWarningLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  accessibilityWarningIcon: {
+    fontSize: 20,
+  },
+  accessibilityWarningTitle: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  accessibilityWarningSub: {
+    color: '#d1d5db',
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  accessibilityEnableBtn: {
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  accessibilityEnableBtnText: {
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

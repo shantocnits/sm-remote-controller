@@ -29,9 +29,10 @@ class RemoteAccessibilityService : AccessibilityService() {
     fun performTap(x: Float, y: Float): Boolean {
         val path = Path().apply {
             moveTo(x, y)
+            lineTo(x + 1f, y + 1f)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
             .build()
         return dispatchGesture(gesture, null, null)
     }
@@ -42,7 +43,7 @@ class RemoteAccessibilityService : AccessibilityService() {
             lineTo(endX, endY)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, Math.max(120L, duration)))
             .build()
         return dispatchGesture(gesture, null, null)
     }

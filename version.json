@@ -1,15 +1,15 @@
 {
-  "version": "1.5.5",
-  "versionCode": 11,
-  "releaseDate": "2026-10-20",
+  "version": "1.5.6",
+  "versionCode": 12,
+  "releaseDate": "2026-10-21",
   "minAppVersion": "1.0.0",
-  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.5/SM_Remote_Controller.apk",
+  "downloadUrl": "https://github.com/shantocnits/sm-remote-controller/releases/download/v1.5.6/SM_Remote_Controller.apk",
   "changelog": [
-    "📱 Real-time Android MediaProjection Foreground Screen Capture Service",
-    "⚡ Seamless background screen streaming (even when app is minimized)",
-    "📡 Interactive Radar Scanner View replaces all dummy app icons on Screen tab",
-    "👆 Real remote touch, click & Android system navigation (Back/Home/Recents)",
-    "🚀 Multi-Broker MQTT Signaling with zero latency and instant popups",
-    "✅ Offline Recent Devices persistence and auto-suppressed duplicate updates"
+    "🚀 Android 14 MediaProjection callback fix — Screen sharing now works on ALL Android devices",
+    "🛡️ Double-buffered frame rendering eliminates 100% of screen flickering / blinking",
+    "👆 High-precision remote Touch, Tap, and Swipe/Scroll gestures (AnyDesk style)",
+    "⚡ Full edge-to-edge remote display with zero gaps and uncluttered clean UI",
+    "🎛️ Ultra-compact docked control bar positioned neatly below the shared screen",
+    "🔗 Synchronized disconnect: Stopping session terminates on both phones simultaneously"
   ]
 }

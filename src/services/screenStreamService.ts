@@ -245,6 +245,27 @@ class ScreenStreamService {
       }
     }
 
+    // 2.1 Incoming swipe dispatch from remote controller phone (Host side)
+    if (msg.type === 'SWIPE' && msg.payload) {
+      const { startRelX, startRelY, endRelX, endRelY, duration } = msg.payload;
+      if (
+        typeof startRelX === 'number' &&
+        typeof startRelY === 'number' &&
+        typeof endRelX === 'number' &&
+        typeof endRelY === 'number'
+      ) {
+        if (ScreenCaptureModule && typeof ScreenCaptureModule.dispatchSwipe === 'function') {
+          ScreenCaptureModule.dispatchSwipe(
+            startRelX,
+            startRelY,
+            endRelX,
+            endRelY,
+            duration || 250
+          ).catch(() => {});
+        }
+      }
+    }
+
     // 3. Incoming navigation dispatch (Host side)
     if (msg.type === 'NAV' && msg.payload) {
       const { action } = msg.payload;

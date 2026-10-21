@@ -125,6 +125,27 @@ class ScreenCaptureModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun dispatchSwipe(startRelX: Double, startRelY: Double, endRelX: Double, endRelY: Double, duration: Double, promise: Promise) {
+        try {
+            val metrics = Resources.getSystem().displayMetrics
+            val startX = (startRelX * metrics.widthPixels).toFloat()
+            val startY = (startRelY * metrics.heightPixels).toFloat()
+            val endX = (endRelX * metrics.widthPixels).toFloat()
+            val endY = (endRelY * metrics.heightPixels).toFloat()
+
+            val service = RemoteAccessibilityService.instance
+            if (service != null) {
+                val success = service.performSwipe(startX, startY, endX, endY, duration.toLong())
+                promise.resolve(success)
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.reject("SWIPE_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun dispatchNav(action: String, promise: Promise) {
         try {
             val service = RemoteAccessibilityService.instance
