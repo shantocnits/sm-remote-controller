@@ -2026,13 +2026,4 @@ const styles = StyleSheet.create({
     gap: 36,
     paddingVertical: 2,
   },
-  navBarBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
-  navBarBtnText: {
-    color: '#94a3b8',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
 });
